@@ -51,6 +51,8 @@ void Forge::SetBrickDimensions(unsigned int _xBrickDim,
 
 bool Forge::Read() {
 
+  std::cout << "Reading header" << std::endl;
+
   // Read header information
   if (header_) {
     std::cout << "Warning: Header already exists, deleting it!" << std::endl;
@@ -98,7 +100,7 @@ bool Forge::Read() {
   unsigned int yNumBricks = yDim / yBrickDim_;
   unsigned int zNumBricks = zDim / zBrickDim_;
   header_->SetNumBricks(xNumBricks, yNumBricks, zNumBricks);
-  bricks_.resize(xNumBricks*yNumBricks*zNumBricks);
+  bricks_.resize(numTimesteps*xNumBricks*yNumBricks*zNumBricks);
 
   std::cout << "Read from " << inFilename_ << " complete!" << std::endl;
   std::cout << "Data dimensionality: " << dataDimensionality << std::endl;
@@ -113,9 +115,14 @@ bool Forge::Read() {
   std::cout << "Data size (bytes): " << header_->DataSize() << std::endl;
   std::cout << "Out file name: " << outFilename_ << std::endl;
 
+  std::cout << "Reading volume data" << std::endl;
+
   // Read bricks
   for (unsigned int timestep=0; timestep<numTimesteps; ++timestep) {
   
+    std::cout << "Reading timestep " << timestep << " of " << numTimesteps << 
+              "\r" << std::flush;
+
     // Read whole timestep into memory
     unsigned int size = xDim*yDim*zDim*sizeof(float);
     std::vector<real> timestepData(xDim*yDim*zDim, static_cast<real>(0));
@@ -158,18 +165,73 @@ bool Forge::Read() {
 
           unsigned int brickIndex = 
             xBrick + yBrick*xNumBricks + zBrick*xNumBricks*yNumBricks;
-          bricks_[brickIndex] = brick;
+          bricks_[timestep*xNumBricks*yNumBricks*zNumBricks+brickIndex]=brick;
         
         }
       }
     }
   }
 
+  std::cout << "                                \r" << std::flush;
+  std::cout << "Reading complete" << std::endl;
+
   return true;
 
 }
 
 bool Forge::Write() {
+
+  std::fstream out;
+  out.open(outFilename_.c_str(), std::ios_base::binary | std::ios_base::out |
+           std::ios_base::trunc);
+  if (out.fail()) {
+    std::cout << "Failed to open " << outFilename_ << std::endl;
+    return false;
+  }
+
+  unsigned int structure = header_->Structure();
+  unsigned int dataDimensionality = header_->DataDimensionality();
+  unsigned int xBrickDim = header_->XBrickDim();
+  unsigned int yBrickDim = header_->YBrickDim();
+  unsigned int zBrickDim = header_->ZBrickDim();
+  unsigned int xNumBricks = header_->XNumBricks();
+  unsigned int yNumBricks = header_->YNumBricks();
+  unsigned int zNumBricks = header_->ZNumBricks();
+  unsigned int numTimesteps = header_->NumTimesteps();
+  unsigned int dataSize = header_->DataSize();
+
+  out.seekp(std::ios_base::beg);
+
+  std::cout << "Writing header" << std::endl;
+
+  // Write header
+  size_t s = sizeof(unsigned int);
+  out.write(reinterpret_cast<char*>(&structure), s);
+  out.write(reinterpret_cast<char*>(&dataDimensionality), s);
+  out.write(reinterpret_cast<char*>(&xBrickDim), s);
+  out.write(reinterpret_cast<char*>(&yBrickDim), s);
+  out.write(reinterpret_cast<char*>(&zBrickDim), s);
+  out.write(reinterpret_cast<char*>(&xNumBricks), s);
+  out.write(reinterpret_cast<char*>(&yNumBricks), s);
+  out.write(reinterpret_cast<char*>(&zNumBricks), s);
+  out.write(reinterpret_cast<char*>(&numTimesteps), s);
+  out.write(reinterpret_cast<char*>(&dataSize), s);
+
+  std::cout << "Writing bricks" << std::endl;
+
+  // Write bricks
+  unsigned int i = 0;
+  for (auto it=bricks_.begin(); it!=bricks_.end(); ++it) {
+    std::cout << "Writing brick " << i++ << " of " << bricks_.size() << 
+              "\r" << std::flush;
+    out.write(reinterpret_cast<char*>(&((*it)->data_[0])), (*it)->Size());        
+  }
+
+  std::cout << "                                        \r" << std::flush;
+  std::cout << "Writing complete" << std::endl;
+
+  out.close();
+
   return true;
 }
 

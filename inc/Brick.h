@@ -25,17 +25,24 @@ public:
                T _value) {
     data_[Index(_x, _y, _z)] = _value;
   }
+
   T Data(unsigned int _x,
          unsigned int _y,
          unsigned int _z) const {
     return data_[Index(_x, _y, _z)];
   }
 
+  unsigned int Size() const {
+    return sizeof(T)*data_.size();
+  }
+
+  friend class Forge;
+
 private:
   Brick(unsigned int _xDim,
         unsigned int _yDim,
         unsigned int _zDim,
-        T _defaultVal) 
+        T _defaultVal)
         : xDim_(_xDim), yDim_(_yDim), zDim_(_zDim) {
     data_.resize(_xDim*_yDim*_zDim, _defaultVal);
   }
@@ -44,7 +51,7 @@ private:
   unsigned int Index(unsigned int _x,
                      unsigned int _y,
                      unsigned int _z) const {
-    return _x + _y*xDim_ + _z*xDim_*yDim_;                     
+    return _x + _y*xDim_ + _z*xDim_*yDim_;
   }
   unsigned int xDim_;
   unsigned int yDim_;
