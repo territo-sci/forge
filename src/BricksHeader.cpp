@@ -14,7 +14,7 @@ BricksHeader * BricksHeader::New() {
 BricksHeader::BricksHeader()
   : structure_(0), dataDimensionality_(0), xBrickDim_(0), yBrickDim_(0),
     zBrickDim_(0), xNumBricks_(0), yNumBricks_(0), zNumBricks_(0),
-    numTimesteps_(0), dataSize_(0) {
+    numTimesteps_(0), paddingWidth_(0), dataSize_(0) {
 }
 
 BricksHeader::~BricksHeader() {
@@ -46,6 +46,10 @@ void BricksHeader::SetNumBricks(unsigned int _xNumBricks,
 
 void BricksHeader::SetNumTimesteps(unsigned int _numTimesteps) {
   numTimesteps_ = _numTimesteps;
+}
+
+void BricksHeader::SetPaddingWidth(unsigned int _paddingWidth) {
+  paddingWidth_ = _paddingWidth;
 }
 
 void BricksHeader::SetDataSize(unsigned int _dataSize) {

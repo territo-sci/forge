@@ -22,6 +22,7 @@ public:
   unsigned int YNumBricks() const { return yNumBricks_; }
   unsigned int ZNumBricks() const { return zNumBricks_; }
   unsigned int NumTimesteps() const { return numTimesteps_; }
+  unsigned int PaddingWidth() const { return paddingWidth_; }
   unsigned int DataSize() const { return dataSize_; }
     
   void SetStructure(unsigned int _structure);
@@ -33,6 +34,7 @@ public:
                     unsigned int _yNumBricks,
                     unsigned int _zNumBricks);
   void SetNumTimesteps(unsigned int _numTimesteps);
+  void SetPaddingWidth(unsigned int _paddingWidth);
   void SetDataSize(unsigned int _dataSize);
 
 private:
@@ -56,6 +58,8 @@ private:
   unsigned int zNumBricks_;
   // Number of timesteps in file
   unsigned int numTimesteps_;
+  // Width of extra voxels around volume (0 = no padding)
+  unsigned int paddingWidth_;
   // Size of brick data entry, in bytes
   unsigned int dataSize_;
   

@@ -17,3 +17,5 @@ data/
 *.lai
 *.la
 *.a
+
+*.tmp

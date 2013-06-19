@@ -36,6 +36,55 @@ public:
     return sizeof(T)*data_.size();
   }
 
+  // Add the values of one brick
+  bool Add(Brick<T> *_brick) {
+    if (xDim_ != _brick->xDim_ ||
+        yDim_ != _brick->yDim_ ||
+        zDim_ != _brick->zDim_) {
+      std::cout << "Brick::Add(): Dimension mismatch" << std::endl;
+      return false;
+    }
+    for (unsigned int z=0; z<zDim_; ++z) {
+      for (unsigned int y=0; y<yDim_; ++y) {
+        for (unsigned int x=0; x<xDim_; ++x) {
+          SetData(x, y, z, Data(x, y, z) + _brick->Data(x, y, z));  
+        }
+      }
+    }
+    return true;
+  }
+
+  // Divide all brick values by a number
+  bool Divide(T _divisor) {
+    if (_divisor == 0) {
+      std::cout << "Brick::Divide(): Division by zero" << std::endl;
+      return false;
+    }
+    for (unsigned int z=0; z<zDim_; ++z) {
+      for (unsigned int y=0; y<yDim_; ++y) {
+        for (unsigned int x=0; x<xDim_; ++x) {
+          SetData(x, y, z, Data(x, y, z)/_divisor);  
+        }
+      }
+    }
+    return true;
+  }
+
+  // Average two bricks, return result
+  static Brick<T> * Average(Brick<T> *_a, Brick<T> *_b) {
+    if (_a->xDim_ != _b->xDim_ ||
+        _a->yDim_ != _b->yDim_ ||
+        _a->zDim_ != _b->zDim_) {
+      std::cout << "Brick::Average(): Dimension mismatch" << std::endl;
+      return NULL;
+    }
+    Brick<T> *out = New(_a->xDim_, _a->yDim_, _a->zDim_, static_cast<T>(0));
+    out->Add(_a);
+    out->Add(_b);
+    out->Divide(static_cast<T>(2));
+    return out;
+  }
+
   friend class Forge;
 
 private:
