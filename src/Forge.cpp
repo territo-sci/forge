@@ -611,7 +611,7 @@ bool Forge::ConstructTSPTree() {
   // Loop over all positions in octree skeleton
   
   // Octree level (to both read from and write to)
-  unsigned int octreeLevel = 0;
+  unsigned int level = 0;
 
   // Number of values in a brick
   unsigned int brickSize = header_->XBrickDim() *
@@ -621,62 +621,87 @@ bool Forge::ConstructTSPTree() {
   // Position in octree to read from (starting at first timestep)
   // Since the octree is constructed from the base level up,
   // the root is at the last brick index
-  unsigned int octreePos = nrBricksPerOctree_*brickSize - brickSize;
-  std::cout << "Starting octree pos: " << octreePos << std::endl;
+  unsigned int octreePos = (nrBricksPerOctree_)*brickSize;
 
-  // Allocate bricks for one BST
-  std::vector<Brick<real>* > BSTBricks(numBSTNodes);
+  // Loop over all octree levels (in backwards order)
+  while (level < nrLevels_) {
 
-  // Starting position in the BST (base level first)
-  // Note that we want the root to be in the front
-  unsigned int BSTBrickPos = numBSTNodes - header_->NumTimesteps();
-  std::cout << "Starting BST brick pos: " << BSTBrickPos << std::endl;
-
-  // Collect all corresponding bricks from the octree and build the leaves
-  for (unsigned int ts=0; ts<header_->NumTimesteps(); ++ts) {
-    Brick<real> *brick = Brick<real>::New(header_->XBrickDim(),
-                                          header_->YBrickDim(),
-                                          header_->ZBrickDim(),
-                                          static_cast<real>(0));
-    real *dataPtr = &(brick->data_[0]);
-    size_t s = brickSize*sizeof(real);
-    std::cout << "Reading from pos " << (ts+1)*octreePos << std::endl;
-    in.seekg(static_cast<std::ios::pos_type>((ts+1)*(octreePos*sizeof(real))));
-    in.read(reinterpret_cast<char*>(dataPtr), brickSize);
-
-    BSTBricks[BSTBrickPos++] = brick;
-  }
-  // Rewind position
-  BSTBrickPos -= header_->NumTimesteps();
-
-  std::cout << "BST brick pos after building base level: " << BSTBrickPos << std::endl;
-
-  // Average bricks to build higher levels in BST
-  // This is really a reversed level, but it works well for loop purposes
-  unsigned int level = 1;
-  do {
+    unsigned int bricksPerLevel = pow(8, level);
+    unsigned int valuesPerLevel = brickSize * bricksPerLevel;
+    octreePos -= valuesPerLevel;
+    std::cout << "Level " << level << " Starting octree pos: " << octreePos << std::endl;
     
-    // Save position for bricks to average from
-    unsigned int fromPos = BSTBrickPos;
+    // Loop over all octree nodes in this level
+    for (unsigned int i=0; i<bricksPerLevel; ++i) {
 
-    // Calculate starting position
-    unsigned int bricksAtLevel = header_->NumTimesteps()/(pow(2, level));
-    BSTBrickPos -= bricksAtLevel;
-    std::cout << "level " << level << " BSTpos " << BSTBrickPos << std::endl;
-    
-    // Average bricks 
-    for (int i=0; i<bricksAtLevel; ++i) {
-      std::cout << fromPos << " & " << fromPos+1 << " -> " << BSTBrickPos << std::endl;
-      BSTBricks[BSTBrickPos] = Brick<real>::Average(BSTBricks[fromPos],
-                                                    BSTBricks[fromPos+1]);
-      BSTBrickPos++;
-      fromPos += 2;
+      std::cout << "Visiting OTN at pos: " << octreePos << std::endl;
+
+      // Allocate bricks for one BST
+      std::vector<Brick<real>* > BSTBricks(numBSTNodes);
+
+      // Starting position in the BST (base level first)
+      // Note that we want the root to be in the front
+      unsigned int BSTBrickPos = numBSTNodes - header_->NumTimesteps();
+      //std::cout << "Starting BST brick pos: " << BSTBrickPos << std::endl;
+
+      // Collect all corresponding bricks from the octree and build the leaves
+      for (unsigned int ts=0; ts<header_->NumTimesteps(); ++ts) {
+        Brick<real> *brick = Brick<real>::New(header_->XBrickDim(),
+                                              header_->YBrickDim(),
+                                              header_->ZBrickDim(),
+                                              static_cast<real>(0));
+        real *dataPtr = &(brick->data_[0]);
+        size_t s = brickSize*sizeof(real);
+        //std::cout << "Reading from pos " << (ts+1)*octreePos << std::endl;
+        in.seekg(static_cast<std::ios::pos_type>((ts+1)*(octreePos*sizeof(real))));
+        in.read(reinterpret_cast<char*>(dataPtr), brickSize);
+
+        BSTBricks[BSTBrickPos++] = brick;
+      }
+      // Rewind position
+      BSTBrickPos -= header_->NumTimesteps();
+
+      //std::cout << "BST brick pos after building base level: " << BSTBrickPos << std::endl;
+
+      // Average bricks to build higher levels in BST
+      // This is really a reversed level, but it works well for loop purposes
+      unsigned int level = 1;
+      do {
+        // Save position for bricks to average from
+        unsigned int fromPos = BSTBrickPos;
+        // Calculate starting position
+        unsigned int bricksAtLevel = header_->NumTimesteps()/(pow(2, level));
+        BSTBrickPos -= bricksAtLevel;
+        //std::cout << "level " << level << " BSTpos " << BSTBrickPos << std::endl;
+        // Average bricks 
+        for (int i=0; i<bricksAtLevel; ++i) {
+          //std::cout << fromPos << " & " << fromPos+1 << " -> " << BSTBrickPos << std::endl;
+          BSTBricks[BSTBrickPos] = Brick<real>::Average(BSTBricks[fromPos],
+                                                        BSTBricks[fromPos+1]);
+          BSTBrickPos++;
+          fromPos += 2;
+        }
+        level++;
+        BSTBrickPos -= bricksAtLevel;
+      } while (BSTBrickPos > 0);
+      
+      // Write BST to file
+      unsigned int s = brickSize*sizeof(real);
+      std::cout << "Writing to pos " << out.tellp()/sizeof(real) << std::endl;
+      for (auto it=BSTBricks.begin(); it!=BSTBricks.end(); ++it) {
+        out.write(reinterpret_cast<char*>(&(*it)->data_[0]), s);  
+      }
+
+
+      octreePos += brickSize;
+ 
     }
+    // Rewind
+    octreePos -= valuesPerLevel;
 
     level++;
-    BSTBrickPos -= bricksAtLevel;
 
-  } while (BSTBrickPos > 0);
+  } // while level < nrLevels
 
   return true;
 }
