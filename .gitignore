@@ -20,3 +20,5 @@ data/
 
 *.tmp
 *.tsp
+
+*.log
