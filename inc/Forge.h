@@ -57,7 +57,7 @@ private:
   // TODO work in progress
 
   const std::string tempFilename_ = "octree.tmp";
-  const std::string tspFilename_ = "output.tsp";
+  const std::string tspFilename_ = "/home/vsand/OpenSpace/output.tsp";
 
 
   // Read header from file and set brick header info
