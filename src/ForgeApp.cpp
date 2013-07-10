@@ -11,7 +11,7 @@ using namespace osp;
 
 int main() {
 
-  std::string in = "/home/vsand/OpenSpace/enlilTestData_256_256_256_32.vdf";
+  std::string in = "/home/vsand/OpenSpace/enlilTestData_256_256_256_32_sph.vdf";
   std::string out = "/home/vsand/OpenSpace/tsp_test.tsp";
 
   Forge* forge = Forge::New();

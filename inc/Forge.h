@@ -31,11 +31,6 @@ public:
                           unsigned int _zBrickDim);
   void SetPaddingWidth(unsigned int _paddingWidth);
 
-  bool Read();
-  bool Write();
-
-  // TODO work in progress
-
   // Do everything!
   bool Construct();
 

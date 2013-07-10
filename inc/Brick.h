@@ -85,6 +85,103 @@ public:
     return out;
   }
 
+  // Filter a brick by combining 2x2x2 voxels
+  // Resulting brick has half size dimensions
+  static Brick<T> * Filter(Brick<T> *_brick) {
+    unsigned int dim = _brick->xDim_;
+    Brick<T> *out = Brick<T>::New(dim/2, dim/2, dim/2, static_cast<T>(0));
+    for (unsigned int z=0; z<dim; z+=2) {
+      for (unsigned int y=0; y<dim; y+=2) {
+        for (unsigned int x=0; x<dim; x+=2) {
+          std::vector<T> toAverage(8, static_cast<T>(0));
+          // Specify the eight voxels to average
+          toAverage[0] = _brick->Data(x,   y,   z  );
+          toAverage[1] = _brick->Data(x+1, y,   z  );
+          toAverage[2] = _brick->Data(x,   y+1, z  );
+          toAverage[3] = _brick->Data(x+1, y+1, z  );
+          toAverage[4] = _brick->Data(x,   y,   z+1);
+          toAverage[5] = _brick->Data(x+1, y,   z+1);
+          toAverage[6] = _brick->Data(x,   y+1, z+1);
+          toAverage[7] = _brick->Data(x+1, y+1, z+1);
+          T sum = static_cast<T>(0);
+          for (auto it=toAverage.begin(); it!=toAverage.end(); ++it) {
+            sum += *it;
+          }
+          out->SetData(x/2, y/2, z/2, sum/static_cast<T>(8));
+        }
+      }
+    }
+    return out;
+  }
+
+  // Combine eight bricks and return a new one, where the dimensions
+  // are twice the dimensions of the combined bricks.
+  // The combined bricks should be in a vector, ordered as follows:
+  // 0: x,   y,   z
+  // 1: x+1, y,   z
+  // 2: x,   y+1, z
+  // 3: x+1, y+1, z
+  // 4: x,   y,   z+1
+  // 5: x+1, y,   z+1
+  // 6: x,   y+1, z+1
+  // 7: x+1, y+1, z+1
+  static Brick<T> * Combine(std::vector<Brick<T> *> _bricks) {
+    // Assume all input sizes are equal
+    unsigned int dim = _bricks[0]->xDim_;
+    Brick<T> *out =  Brick<T>::New(dim*2, dim*2, dim*2, static_cast<T>(0));
+    
+    if (_bricks.size() != 8) {
+      std::cout << "ERROR: Combine vector not of size 8" << std::endl;
+      return out;
+    }
+
+    // Loop over positions in new brick 
+    for (unsigned int z=0; z<dim*2; ++z) {
+      for (unsigned int y=0; y<dim*2; ++y) {
+        for (unsigned int x=0; x<dim*2; ++x) {
+        
+          T value;
+          // Choose and sample from the right quadrant
+          if (x < dim) { // quadrant 0, 2, 4 or 6
+            if (y < dim) { // quadrant 0 or 4
+              if (z < dim) { // quadrant 0
+                value = _bricks[0]->Data(x, y, z); 
+              } else { // quadrant 4
+                value = _bricks[4]->Data(x, y, z-dim);
+              }
+            } else { // quadrant 2 or 6
+              if (z < dim) { // quadrant 2
+                value = _bricks[2]->Data(x, y-dim, z);
+              } else { // quadrant 6
+                value = _bricks[6]->Data(x, y-dim, z-dim);
+              }
+            }
+          } else {// quadrant 1, 3, 5 or 7
+            if (y < dim) { // quadrant 1 or 5
+              if (z < dim) { // quadrant 1
+                value = _bricks[1]->Data(x-dim, y, z);
+              } else { // quadrant 5
+                value = _bricks[5]->Data(x-dim, y, z-dim); 
+              } 
+            } else { // quadrant 3 or 7
+              if (z < dim) { // quadrant 3
+                value = _bricks[3]->Data(x-dim, y-dim, z);
+              } else { // quadrant 7
+                value = _bricks[7]->Data(x-dim, y-dim, z-dim);
+              }
+            }
+          }
+
+          out->SetData(x, y, z, value);
+
+        }
+      }
+    }
+
+    return out;
+
+  }
+
   friend class Forge;
 
 private:
