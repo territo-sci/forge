@@ -1,0 +1,155 @@
+Creating header
+Reading header
+dim: 16
+paddedDim: 18
+brickDim: 4
+paddedBrickDim: 6
+Read from /home/vsand/OpenSpace/enlilTestData_16_16_16_32_sph.vdf complete!
+Data dimensionality: 1
+Number of timesteps: 32
+Dimensions: 16 x 16 x 16
+Brick dimensions: 4 x 4 x 4
+Number of bricks: 4 x 4 x 4
+Structure: 0
+Data size (bytes): 4
+Out file name: /home/vsand/OpenSpace/tsp_test.tsp
+Number of bricks in base octree level: 64
+Number of levels in octree: 3
+Number of bricks in octree: 73
+Constructing octree for timestep 0
+timestepData size: 4096
+paddedData size: 5832
+63072
+Constructing octree for timestep 1
+timestepData size: 4096
+paddedData size: 5832
+126144
+Constructing octree for timestep 2
+timestepData size: 4096
+paddedData size: 5832
+189216
+Constructing octree for timestep 3
+timestepData size: 4096
+paddedData size: 5832
+252288
+Constructing octree for timestep 4
+timestepData size: 4096
+paddedData size: 5832
+315360
+Constructing octree for timestep 5
+timestepData size: 4096
+paddedData size: 5832
+378432
+Constructing octree for timestep 6
+timestepData size: 4096
+paddedData size: 5832
+441504
+Constructing octree for timestep 7
+timestepData size: 4096
+paddedData size: 5832
+504576
+Constructing octree for timestep 8
+timestepData size: 4096
+paddedData size: 5832
+567648
+Constructing octree for timestep 9
+timestepData size: 4096
+paddedData size: 5832
+630720
+Constructing octree for timestep 10
+timestepData size: 4096
+paddedData size: 5832
+693792
+Constructing octree for timestep 11
+timestepData size: 4096
+paddedData size: 5832
+756864
+Constructing octree for timestep 12
+timestepData size: 4096
+paddedData size: 5832
+819936
+Constructing octree for timestep 13
+timestepData size: 4096
+paddedData size: 5832
+883008
+Constructing octree for timestep 14
+timestepData size: 4096
+paddedData size: 5832
+946080
+Constructing octree for timestep 15
+timestepData size: 4096
+paddedData size: 5832
+1009152
+Constructing octree for timestep 16
+timestepData size: 4096
+paddedData size: 5832
+1072224
+Constructing octree for timestep 17
+timestepData size: 4096
+paddedData size: 5832
+1135296
+Constructing octree for timestep 18
+timestepData size: 4096
+paddedData size: 5832
+1198368
+Constructing octree for timestep 19
+timestepData size: 4096
+paddedData size: 5832
+1261440
+Constructing octree for timestep 20
+timestepData size: 4096
+paddedData size: 5832
+1324512
+Constructing octree for timestep 21
+timestepData size: 4096
+paddedData size: 5832
+1387584
+Constructing octree for timestep 22
+timestepData size: 4096
+paddedData size: 5832
+1450656
+Constructing octree for timestep 23
+timestepData size: 4096
+paddedData size: 5832
+1513728
+Constructing octree for timestep 24
+timestepData size: 4096
+paddedData size: 5832
+1576800
+Constructing octree for timestep 25
+timestepData size: 4096
+paddedData size: 5832
+1639872
+Constructing octree for timestep 26
+timestepData size: 4096
+paddedData size: 5832
+1702944
+Constructing octree for timestep 27
+timestepData size: 4096
+paddedData size: 5832
+1766016
+Constructing octree for timestep 28
+timestepData size: 4096
+paddedData size: 5832
+1829088
+Constructing octree for timestep 29
+timestepData size: 4096
+paddedData size: 5832
+1892160
+Constructing octree for timestep 30
+timestepData size: 4096
+paddedData size: 5832
+1955232
+Constructing octree for timestep 31
+timestepData size: 4096
+paddedData size: 5832
+2018304
+Number of nodes per octree 73
+Num nodes in BST: 63
+Writing header
+Position after writing header: 44
+Padded brick dimensions 6
+Num values in brick 216
+Level 0, starting octree pos: 15552
+Level 1, starting octree pos: 13824
+Level 2, starting octree pos: 0

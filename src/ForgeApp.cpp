@@ -19,7 +19,7 @@ int main() {
   forge->SetInFilename(in);
   forge->SetOutFilename(out);
   forge->SetStructure(0); // flat structure
-  forge->SetBrickDimensions(64, 64, 64);
+  forge->SetBrickDimensions(128, 128, 128);
  
  // if (!forge->Read()) exit(1);
   //if (!forge->Write()) exit(1);
