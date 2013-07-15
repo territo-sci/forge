@@ -18,15 +18,12 @@ int main() {
   
   forge->SetInFilename(in);
   forge->SetOutFilename(out);
-  forge->SetStructure(0); // flat structure
-  forge->SetBrickDimensions(128, 128, 128);
- 
- // if (!forge->Read()) exit(1);
-  //if (!forge->Write()) exit(1);
+  forge->SetStructure(0); // TODO use for different TSP setups 
+  forge->SetBrickDimensions(64, 64, 64);
+  forge->SetPaddingWidth(1);
   
   // TODO testing testing
   if (!forge->Construct()) exit(1);
-
 
   delete forge;
 
