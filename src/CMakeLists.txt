@@ -10,7 +10,6 @@ link_directories(${Boost_LIBRARY_DIR})
 
 add_executable(ForgeApp
                ForgeApp.cpp
-               Forge.cpp
-               BricksHeader.cpp)
+               Forge.cpp)
 
 target_link_libraries(ForgeApp ${Boost_LIBRARIES})

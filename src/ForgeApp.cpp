@@ -19,7 +19,7 @@ int main() {
   forge->SetInFilename(in);
   forge->SetOutFilename(out);
   forge->SetStructure(0); // TODO use for different TSP setups 
-  forge->SetBrickDimensions(64, 64, 64);
+  forge->SetBrickDimensions(64);
   forge->SetPaddingWidth(1);
   
   // TODO testing testing

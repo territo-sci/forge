@@ -4,7 +4,6 @@
  */
 
 #include <Forge.h>
-#include <BricksHeader.h>
 #include <Brick.h>
 #include <iostream>
 #include <sstream>
@@ -20,15 +19,11 @@ Forge * Forge::New() {
 }
 
 Forge::Forge() 
-  : inFilename_("NotSet"), outFilename_("NotSet"), header_(NULL),
-    structure_(0), xBrickDim_(0), yBrickDim_(0), zBrickDim_(0), 
-    paddingWidth_(0) {
+  : inFilename_("NotSet"), outFilename_("NotSet"),
+    structure_(0), brickDim_(0), paddingWidth_(0) {
 }
 
 Forge::~Forge() {
-  if (header_) {
-    delete header_;
-  }
   for (auto it=bricks_.begin(); it!=bricks_.end(); ++it) {
     delete *it;
   }
@@ -46,12 +41,8 @@ void Forge::SetStructure(unsigned int _structure) {
   structure_ = _structure;
 }
 
-void Forge::SetBrickDimensions(unsigned int _xBrickDim,
-                               unsigned int _yBrickDim,
-                               unsigned int _zBrickDim) {
-  xBrickDim_ = _xBrickDim;
-  yBrickDim_ = _yBrickDim;
-  zBrickDim_ = _zBrickDim;
+void Forge::SetBrickDimensions(unsigned int _brickDim) {
+  brickDim_ = _brickDim;
 }
 
 void Forge::SetPaddingWidth(unsigned int _paddingWidth) {
@@ -60,10 +51,10 @@ void Forge::SetPaddingWidth(unsigned int _paddingWidth) {
 
 bool Forge::Construct() {
 
-  // Create header
-  std::cout << "Creating header" << std::endl;
-  if (!CreateHeader()) {
-    std::cout << "Error: Could not create header" << std::endl;
+  // Read metadata 
+  std::cout << "Reading metadata" << std::endl;
+  if (!ReadMetadata()) {
+    std::cout << "Error: Could not read metadata" << std::endl;
     return false;
   }
 
@@ -86,93 +77,76 @@ bool Forge::Construct() {
 }
 
 
-bool Forge::CreateHeader() {
+bool Forge::ReadMetadata() {
 
-  std::cout << "Reading header" << std::endl;
+  std::cout << "Reading metadata" << std::endl;
 
-  // Read header information
-  if (header_) {
-    std::cout << "Warning: Header already exists, deleting it!" << std::endl;
-    delete header_;
+  if (brickDim_ == 0) {
+    std::cout << "Warning: Brick dimensions are zero!"<< std::endl;
   }
 
-  header_ = BricksHeader::New();
-  
-  // Set the data not read from file
-  header_->SetStructure(structure_);
-  if (xBrickDim_ == 0 || yBrickDim_ == 0 || zBrickDim_ == 0) {
-    std::cout << "Warning: One or more brick dimensions are zero!"<< std::endl;
-  }
-  header_->SetDimensions(xBrickDim_, yBrickDim_, zBrickDim_);
-  header_->SetPaddingWidth(paddingWidth_);
-  header_->SetDataSize(static_cast<unsigned int>(sizeof(real)));
+  dataSize_ = sizeof(real);
 
   // Read from file
   if (instream_.is_open()) {
     std::cout << "Error: Instream is already open!" << std::endl;
-    delete header_;
     return false;
   }
   instream_.open(inFilename_.c_str(), 
-
                 std::ios_base::in | std::ios_base::binary);
   if (!instream_.is_open()) {
     std::cout << "Error: Could not open file." << std::endl;
-    delete header_;
     return false;
   }
   
-  unsigned int dataDimensionality = 0, numTimesteps = 0,
-               xDim = 0, yDim = 0, zDim = 0;
   size_t s = sizeof(unsigned int);
-
-  instream_.read(reinterpret_cast<char*>(&dataDimensionality), s);
-  instream_.read(reinterpret_cast<char*>(&numTimesteps), s);
-  instream_.read(reinterpret_cast<char*>(&xDim), s);
-  instream_.read(reinterpret_cast<char*>(&yDim), s);
-  instream_.read(reinterpret_cast<char*>(&zDim), s);
+  instream_.read(reinterpret_cast<char*>(&dataDimensionality_), s);
+  instream_.read(reinterpret_cast<char*>(&numTimesteps_), s);
+  instream_.read(reinterpret_cast<char*>(&dim_), s);
+  instream_.read(reinterpret_cast<char*>(&dim_), s);
+  instream_.read(reinterpret_cast<char*>(&dim_), s);
 
   // TODO support non-full BST trees? Right now, the number of timesteps
   // needs to be a power of two. Abort if it's not.
-  if ( (numTimesteps & (numTimesteps-1)) != 0) {
+  if ( (numTimesteps_ & (numTimesteps_-1)) != 0) {
     std::cout << "ERROR: Number of timesteps not  power of two" << std::endl;
     return false;
   }
 
-  header_->SetDataDimensionality(dataDimensionality);
-  header_->SetNumTimesteps(numTimesteps);
-
-  if (xDim % xBrickDim_ !=0 ||yDim % yBrickDim_ !=0||zDim % zBrickDim_ !=0) {
+  if (dim_ % brickDim_ !=0) {
     std::cout << "Error: Voxel and brick dimension mismatch!" << std::endl;
     instream_.close();
-    delete header_;
     return false;
   }
 
-  unsigned int xNumBricks = xDim / xBrickDim_;
-  unsigned int yNumBricks = yDim / yBrickDim_;
-  unsigned int zNumBricks = zDim / zBrickDim_;
-  header_->SetNumBricks(xNumBricks, yNumBricks, zNumBricks);
+  numBricks_ = dim_ / brickDim_;
+  paddedDim_ = dim_ + paddingWidth_*2;
+  paddedBrickDim_ = brickDim_ + paddingWidth_*2;
 
+  std::cout << std::endl << "FORGE METADATA" << std::endl;
   std::cout << "Read from " << inFilename_ << " complete!" << std::endl;
-  std::cout << "Data dimensionality: " << dataDimensionality << std::endl;
-  std::cout << "Number of timesteps: " << numTimesteps << std::endl;
-  std::cout << "Dimensions: " << xDim << " x " << yDim <<  
-               " x " << zDim << std::endl;
-  std::cout << "Brick dimensions: " << xBrickDim_ << " x " << yBrickDim_ <<
-               " x " << zBrickDim_ << std::endl;
-  std::cout << "Number of bricks: " << xNumBricks << " x " << yNumBricks << 
-               " x " << zNumBricks << std::endl;
   std::cout << "Structure: " << structure_ << std::endl;
-  std::cout << "Data size (bytes): " << header_->DataSize() << std::endl;
+  std::cout << "Data dimensionality: " << dataDimensionality_ << std::endl;
+  std::cout << "Number of timesteps: " << numTimesteps_ << std::endl;
+  std::cout << "Dimensions: " << dim_ << " x " << dim_ <<  
+               " x " << dim_ << std::endl;
+  std::cout << "Brick dimensions: " << brickDim_ << " x " << brickDim_ <<
+               " x " << brickDim_ << std::endl;
+  std::cout << "Padded dimensions: " << paddedDim_ << " x " << paddedDim_ <<
+               " x " << paddedDim_ << std::endl;
+  std::cout << "Padded brick dimensions: " << paddedBrickDim_ << " x " <<
+                paddedBrickDim_ << " x " << paddedBrickDim_ << std::endl;
+  std::cout << "Number of bricks: " << numBricks_ << " x " << numBricks_ << 
+               " x " << numBricks_ << std::endl;
+  std::cout << "Data size (bytes): " << dataSize_ << std::endl;
   std::cout << "Out file name: " << outFilename_ << std::endl;
 
   // Calculate some common things
 
   // Number of bricks in the base (leaf) level
-  nrBricksBaseLevel_ = xNumBricks*yNumBricks*zNumBricks;
+  nrBricksBaseLevel_ = numBricks_*numBricks_*numBricks_;
   // Number of octree levels
-  nrLevels_ = log(xNumBricks)/log(2) + 1;
+  nrLevels_ = log(numBricks_)/log(2) + 1;
   // Number of bricks per octree (used for offsets)
   nrBricksPerOctree_ = (pow(8, nrLevels_) - 1) / 7;
 
@@ -192,11 +166,6 @@ bool Forge::CreateHeader() {
 
 bool Forge::CreateOctree() {
   
-  if (!header_) {
-    std::cout << "Error: No header" << std::endl;
-    return false;
-  }
-
   // Init out file
   std::fstream out;
   out.open(tempFilename_.c_str(),
@@ -214,31 +183,16 @@ bool Forge::CreateOctree() {
     std::cout << "Could not open " << inFilename_ <<" for reading"<<std::endl;
   }
 
-  // Loop over all timesteps
-  for (unsigned int i=0; i<header_->NumTimesteps(); ++i) {
+  // Loop over all timesteps to create a basic, non-padded volume.
+  for (unsigned int i=0; i<numTimesteps_; ++i) {
     
     std::cout << "Constructing octree for timestep " << i << std::endl;
-    // Construct bricks for this timestep (regular order)
-    
     // Read whole timestep into memory
 
-    // Brick dimensions
-    unsigned int xBrickDim = header_->XBrickDim();
-    unsigned int yBrickDim = header_->YBrickDim();
-    unsigned int zBrickDim = header_->ZBrickDim();
-    unsigned int xNumBricks = header_->XNumBricks();
-    unsigned int yNumBricks = header_->YNumBricks();
-    unsigned int zNumBricks = header_->ZNumBricks();
-
-    // Voxel dimensions
-    unsigned int xDim = xBrickDim*xNumBricks;
-    unsigned int yDim = yBrickDim*yNumBricks;
-    unsigned int zDim = zBrickDim*zNumBricks;
-
-    std::vector<real> timestepData(xDim*yDim*zDim, static_cast<real>(0));
+    std::vector<real> timestepData(dim_*dim_*dim_, static_cast<real>(0));
 
     // Point to the right position in the file stream
-    unsigned int timestepSize = xDim*yDim*zDim*sizeof(real);
+    unsigned int timestepSize = dim_*dim_*dim_*sizeof(real);
     std::ios::pos_type timestepOffset = 
       static_cast<std::ios::pos_type>(i*timestepSize) + headerOffset_;
     in.seekg(timestepOffset);
@@ -249,22 +203,22 @@ bool Forge::CreateOctree() {
     std::vector<Brick<real>* > baseLevelBricks(nrBricksBaseLevel_, NULL);
 
     // Loop over the volume's subvolumes and create one brick for each
-    for (unsigned int zBrick=0; zBrick<zNumBricks; ++zBrick) {
-      for (unsigned int yBrick=0; yBrick<yNumBricks; ++yBrick) {
-        for (unsigned int xBrick=0; xBrick<xNumBricks; ++xBrick) {
+    for (unsigned int zBrick=0; zBrick<numBricks_; ++zBrick) {
+      for (unsigned int yBrick=0; yBrick<numBricks_; ++yBrick) {
+        for (unsigned int xBrick=0; xBrick<numBricks_; ++xBrick) {
         
-          Brick<real> *brick = Brick<real>::New(xBrickDim, 
-                                                yBrickDim, 
-                                                zBrickDim,
+          Brick<real> *brick = Brick<real>::New(brickDim_, 
+                                                brickDim_, 
+                                                brickDim_,
                                                 static_cast<real>(0));  
             
           // Loop over the subvolume's voxels
-          unsigned int xMin = xBrick * xBrickDim_;
-          unsigned int xMax = (xBrick + 1) * xBrickDim_ - 1;
-          unsigned int yMin = yBrick * yBrickDim_;
-          unsigned int yMax = (yBrick + 1) * yBrickDim_ - 1;
-          unsigned int zMin = zBrick * zBrickDim_;
-          unsigned int zMax = (zBrick + 1) * zBrickDim_ - 1;
+          unsigned int xMin = xBrick * brickDim_;
+          unsigned int xMax = (xBrick + 1) * brickDim_ - 1;
+          unsigned int yMin = yBrick * brickDim_;
+          unsigned int yMax = (yBrick + 1) * brickDim_ - 1;
+          unsigned int zMin = zBrick * brickDim_;
+          unsigned int zMax = (zBrick + 1) * brickDim_ - 1;
           unsigned int zLoc= 0;
           for (unsigned int zSub=zMin; zSub<=zMax; ++zSub) {
             unsigned int yLoc = 0;
@@ -273,7 +227,7 @@ bool Forge::CreateOctree() {
               for (unsigned int xSub=xMin; xSub<=xMax; ++xSub) {
                 // Look up global index in full volume
                 unsigned int globalIndex = 
-                  xSub + ySub*xDim + zSub*xDim*yDim;
+                  xSub + ySub*dim_ + zSub*dim_*dim_;
                 // Set data at local subvolume index
 
                 brick->SetData(xLoc, yLoc, zLoc, timestepData[globalIndex]); 
@@ -287,12 +241,12 @@ bool Forge::CreateOctree() {
 
           // Save to base level
           unsigned int brickIndex = 
-            xBrick + yBrick*xNumBricks + zBrick*xNumBricks*yNumBricks;
+            xBrick + yBrick*numBricks_ + zBrick*numBricks_*numBricks_;
             /*
           delete brick;
-          brick = Brick<real>::New(xBrickDim,
-                                   yBrickDim,
-                                   zBrickDim,
+          brick = Brick<real>::New(brickDim,
+                                   brickDim,
+                                   brickDim,
                                    static_cast<real>((float)brickIndex/64.0));
           */
           baseLevelBricks[brickIndex] = brick;
@@ -306,11 +260,11 @@ bool Forge::CreateOctree() {
 
     // so that the eight children for each parent node lies
     // next to each other
-    for (uint16_t z=0; z<(uint16_t)zNumBricks; ++z) { 
-      for (uint16_t y=0; y<(uint16_t)yNumBricks; ++y) {
-        for (uint16_t x=0; x<(uint16_t)xNumBricks; ++x) {
+    for (uint16_t z=0; z<(uint16_t)numBricks_; ++z) { 
+      for (uint16_t y=0; y<(uint16_t)numBricks_; ++y) {
+        for (uint16_t x=0; x<(uint16_t)numBricks_; ++x) {
           unsigned int zOrderIdx = static_cast<unsigned int>(ZOrder(x, y, z));
-          unsigned int idx = x + y*xNumBricks + z*xNumBricks*yNumBricks;
+          unsigned int idx = x + y*numBricks_ + z*numBricks_*numBricks_;
           octreeBricks[zOrderIdx] = baseLevelBricks[idx];
 
         }
@@ -415,7 +369,7 @@ bool Forge::ConstructTSPTree() {
   std::cout << "Number of nodes per octree " << numOctreeNodes << std::endl;
 
   // Number of nodes in binary time tree
-  unsigned int numBSTNodes = 2*header_->NumTimesteps() - 1;
+  unsigned int numBSTNodes = 2*numTimesteps_ - 1;
   std::cout << "Num nodes in BST: " << numBSTNodes << std::endl;
 
   std::fstream out;
@@ -427,32 +381,21 @@ bool Forge::ConstructTSPTree() {
   }
   
   // Write header
-  unsigned int structure = header_->Structure();
-  unsigned int dataDimensionality = header_->DataDimensionality();
-  unsigned int xBrickDim = header_->XBrickDim();
-  unsigned int yBrickDim = header_->YBrickDim();
-  unsigned int zBrickDim = header_->ZBrickDim();
-  unsigned int xNumBricks = header_->XNumBricks();
-  unsigned int yNumBricks = header_->YNumBricks();
-  unsigned int zNumBricks = header_->ZNumBricks();
-  unsigned int numTimesteps = header_->NumTimesteps();
-  unsigned int paddingWidth = header_->PaddingWidth();
-  unsigned int dataSize = header_->DataSize();
   out.seekp(std::ios_base::beg);
   std::cout << "Writing header" << std::endl;
   // Write header
   size_t s = sizeof(unsigned int);
-  out.write(reinterpret_cast<char*>(&structure), s);
-  out.write(reinterpret_cast<char*>(&dataDimensionality), s);
-  out.write(reinterpret_cast<char*>(&xBrickDim), s);
-  out.write(reinterpret_cast<char*>(&yBrickDim), s);
-  out.write(reinterpret_cast<char*>(&zBrickDim), s);
-  out.write(reinterpret_cast<char*>(&xNumBricks), s);
-  out.write(reinterpret_cast<char*>(&yNumBricks), s);
-  out.write(reinterpret_cast<char*>(&zNumBricks), s);
-  out.write(reinterpret_cast<char*>(&numTimesteps), s);
-  out.write(reinterpret_cast<char*>(&paddingWidth), s);
-  out.write(reinterpret_cast<char*>(&dataSize), s);
+  out.write(reinterpret_cast<char*>(&structure_), s);
+  out.write(reinterpret_cast<char*>(&dataDimensionality_), s);
+  out.write(reinterpret_cast<char*>(&brickDim_), s);
+  out.write(reinterpret_cast<char*>(&brickDim_), s);
+  out.write(reinterpret_cast<char*>(&brickDim_), s);
+  out.write(reinterpret_cast<char*>(&numBricks_), s);
+  out.write(reinterpret_cast<char*>(&numBricks_), s);
+  out.write(reinterpret_cast<char*>(&numBricks_), s);
+  out.write(reinterpret_cast<char*>(&numTimesteps_), s);
+  out.write(reinterpret_cast<char*>(&paddingWidth_), s);
+  out.write(reinterpret_cast<char*>(&dataSize_), s);
 
   std::cout << "Position after writing header: " << out.tellp() << std::endl;
 
@@ -462,7 +405,7 @@ bool Forge::ConstructTSPTree() {
   unsigned int level = 0;
 
   // Number of values in a brick
-  unsigned int brickSize = xBrickDim * yBrickDim * zBrickDim; 
+  unsigned int brickSize = brickDim_ * brickDim_ * brickDim_; 
   std::cout << "Num values in brick " << brickSize << std::endl;
 
   // Position in octree to read from (starting at first timestep)
@@ -486,24 +429,24 @@ bool Forge::ConstructTSPTree() {
 
       // Starting position in the BST (base level first)
       // Note that we want the root to be in the front
-      unsigned int BSTBrickPos = numBSTNodes - header_->NumTimesteps();
+      unsigned int BSTBrickPos = numBSTNodes - numTimesteps_;
 
       // Collect all corresponding bricks from the octree and build the leaves
-      for (unsigned int ts=0; ts<header_->NumTimesteps(); ++ts) {
-        Brick<real> *brick = Brick<real>::New(header_->XBrickDim(),
-                                              header_->YBrickDim(),
-                                              header_->ZBrickDim(),
+      for (unsigned int ts=0; ts<numTimesteps_; ++ts) {
+        Brick<real> *brick = Brick<real>::New(brickDim_,
+                                              brickDim_,
+                                              brickDim_,
                                               static_cast<real>(0));
         real *dataPtr = &(brick->data_[0]);
         size_t s = brickSize*sizeof(real);
-        in.seekg(static_cast<std::ios::pos_type>((octreePos+ts*numOctreeNodes*brickSize)*sizeof(real)));
+        in.seekg(static_cast<std::ios::pos_type>(
+          (octreePos+ts*numOctreeNodes*brickSize)*sizeof(real)));
         in.read(reinterpret_cast<char*>(dataPtr), s);
 
         BSTBricks[BSTBrickPos++] = brick;
       }
       // Rewind position
-      BSTBrickPos -= header_->NumTimesteps();
-
+      BSTBrickPos -= numTimesteps_;
 
       // Average bricks to build higher levels in BST
       // This is really a reversed level, but it works well for loop purposes
@@ -512,11 +455,10 @@ bool Forge::ConstructTSPTree() {
         // Save position for bricks to average from
         unsigned int fromPos = BSTBrickPos;
         // Calculate starting position
-        unsigned int bricksAtLevel = header_->NumTimesteps()/(pow(2, level));
+        unsigned int bricksAtLevel = numTimesteps_/(pow(2, level));
         BSTBrickPos -= bricksAtLevel;
         // Average bricks 
         for (int i=0; i<bricksAtLevel; ++i) {
-          //std::cout << fromPos << " & " << fromPos+1 << " -> " << BSTBrickPos << std::endl;
           BSTBricks[BSTBrickPos] = Brick<real>::Average(BSTBricks[fromPos],
                                                         BSTBricks[fromPos+1]);
           BSTBrickPos++;
