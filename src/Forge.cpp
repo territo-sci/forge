@@ -183,7 +183,7 @@ bool Forge::CreateOctree() {
     std::cout << "Could not open " << inFilename_ <<" for reading"<<std::endl;
   }
 
-  // Loop over all timesteps to create a basic, non-padded volume.
+  // Loop over all timesteps 
   for (unsigned int i=0; i<numTimesteps_; ++i) {
     
     std::cout << "Constructing octree for timestep " << i << std::endl;
@@ -192,12 +192,56 @@ bool Forge::CreateOctree() {
     std::vector<real> timestepData(dim_*dim_*dim_, static_cast<real>(0));
 
     // Point to the right position in the file stream
-    unsigned int timestepSize = dim_*dim_*dim_*sizeof(real);
+    unsigned int timestepSize = dim_*dim_*dim_*dataSize_;
     std::ios::pos_type timestepOffset = 
       static_cast<std::ios::pos_type>(i*timestepSize) + headerOffset_;
     in.seekg(timestepOffset);
     // Read data
     in.read(reinterpret_cast<char*>(&timestepData[0]), timestepSize);
+
+    // We now have a non-padded time step, and need to pad the borders.
+    // If the padding width is 0, this should result in the same volume as 
+    // before.
+    std::vector<real> paddedData(paddedDim_*paddedDim_*paddedDim_,
+                                 static_cast<real>(0));
+    // Loop over padded volume to fill
+    // xp -> "x padded"
+    // xo -> "x original"
+    unsigned int xo, yo, zo;
+    for (unsigned int zp=0; zp<paddedDim_; ++zp) {
+      for (unsigned int yp=0; yp<paddedDim_; ++yp) {
+        for (unsigned int xp=0; xp<paddedDim_; ++xp) {
+          
+          if (xp == 0) {
+            xo = xp;
+          } else if (xp == paddedDim_-1) {
+            xo = xp-2;
+          } else {
+            xo = xp-1;
+          }
+
+          if (yp == 0) {
+            yo = yp;
+          } else if (yp == paddedDim_-1) {
+            yo = yp-2;
+          } else {
+            yo = yp-1;
+          }
+          
+          if (zp == 0) {
+            zo = zp;
+          } else if (zp == paddedDim_-1) {
+            zo = zp-2;
+          } else {
+            zo = zp-1;
+          }
+
+          paddedData[xp + yp*paddedDim_ + zp*paddedDim_*paddedDim_] =
+            timestepData[xo + yo*dim_ + zo*dim_*dim_];
+
+        }
+      }
+    }
 
     // Create a container for the base level bricks.
     std::vector<Brick<real>* > baseLevelBricks(nrBricksBaseLevel_, NULL);
@@ -207,18 +251,19 @@ bool Forge::CreateOctree() {
       for (unsigned int yBrick=0; yBrick<numBricks_; ++yBrick) {
         for (unsigned int xBrick=0; xBrick<numBricks_; ++xBrick) {
         
-          Brick<real> *brick = Brick<real>::New(brickDim_, 
-                                                brickDim_, 
-                                                brickDim_,
+          Brick<real> *brick = Brick<real>::New(paddedBrickDim_, 
+                                                paddedBrickDim_, 
+                                                paddedBrickDim_,
                                                 static_cast<real>(0));  
             
           // Loop over the subvolume's voxels
           unsigned int xMin = xBrick * brickDim_;
-          unsigned int xMax = (xBrick + 1) * brickDim_ - 1;
+          unsigned int xMax = (xBrick + 1) * brickDim_ - 1 + paddingWidth_*2;
           unsigned int yMin = yBrick * brickDim_;
-          unsigned int yMax = (yBrick + 1) * brickDim_ - 1;
+          unsigned int yMax = (yBrick + 1) * brickDim_ - 1 + paddingWidth_*2;
           unsigned int zMin = zBrick * brickDim_;
-          unsigned int zMax = (zBrick + 1) * brickDim_ - 1;
+          unsigned int zMax = (zBrick + 1) * brickDim_ - 1 + paddingWidth_*2;
+          //std::cout << "xmin / xmax " << xMin << " / " << xMax << std::endl;
           unsigned int zLoc= 0;
           for (unsigned int zSub=zMin; zSub<=zMax; ++zSub) {
             unsigned int yLoc = 0;
@@ -227,10 +272,9 @@ bool Forge::CreateOctree() {
               for (unsigned int xSub=xMin; xSub<=xMax; ++xSub) {
                 // Look up global index in full volume
                 unsigned int globalIndex = 
-                  xSub + ySub*dim_ + zSub*dim_*dim_;
+                  xSub + ySub*paddedDim_ + zSub*paddedDim_*paddedDim_;
                 // Set data at local subvolume index
-
-                brick->SetData(xLoc, yLoc, zLoc, timestepData[globalIndex]); 
+                brick->SetData(xLoc, yLoc, zLoc, paddedData[globalIndex]); 
                 xLoc++;
               }
               yLoc++;
@@ -238,17 +282,9 @@ bool Forge::CreateOctree() {
             zLoc++;
           }
 
-
           // Save to base level
           unsigned int brickIndex = 
             xBrick + yBrick*numBricks_ + zBrick*numBricks_*numBricks_;
-            /*
-          delete brick;
-          brick = Brick<real>::New(brickDim,
-                                   brickDim,
-                                   brickDim,
-                                   static_cast<real>((float)brickIndex/64.0));
-          */
           baseLevelBricks[brickIndex] = brick;
         }
       }
@@ -405,7 +441,7 @@ bool Forge::ConstructTSPTree() {
   unsigned int level = 0;
 
   // Number of values in a brick
-  unsigned int brickSize = brickDim_ * brickDim_ * brickDim_; 
+  unsigned int brickSize = paddedBrickDim_*paddedBrickDim_*paddedBrickDim_; 
   std::cout << "Num values in brick " << brickSize << std::endl;
 
   // Position in octree to read from (starting at first timestep)
@@ -419,7 +455,8 @@ bool Forge::ConstructTSPTree() {
     unsigned int bricksPerLevel = pow(8, level);
     unsigned int valuesPerLevel = brickSize * bricksPerLevel;
     octreePos -= valuesPerLevel;
-    std::cout << "Level " << level << ", starting octree pos: " << octreePos << std::endl;
+    //std::cout << "Level " << level << 
+    //  ", starting octree pos: " << octreePos << std::endl;
     
     // Loop over all octree nodes in this level
     for (unsigned int i=0; i<bricksPerLevel; ++i) {
@@ -433,9 +470,9 @@ bool Forge::ConstructTSPTree() {
 
       // Collect all corresponding bricks from the octree and build the leaves
       for (unsigned int ts=0; ts<numTimesteps_; ++ts) {
-        Brick<real> *brick = Brick<real>::New(brickDim_,
-                                              brickDim_,
-                                              brickDim_,
+        Brick<real> *brick = Brick<real>::New(paddedBrickDim_,
+                                              paddedBrickDim_,
+                                              paddedBrickDim_,
                                               static_cast<real>(0));
         real *dataPtr = &(brick->data_[0]);
         size_t s = brickSize*sizeof(real);
