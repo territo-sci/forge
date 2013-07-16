@@ -69,6 +69,8 @@ private:
   bool DeleteTempFile();
   // Use temp octrees to create TSP tree
   bool ConstructTSPTree();
+  // Use temo octrees to create TSP tree (spatial ordering)
+  bool ConstructTSPTreeSpatial();
 
   std::fstream instream_;
 

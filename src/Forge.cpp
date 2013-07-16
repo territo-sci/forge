@@ -64,14 +64,22 @@ bool Forge::Construct() {
     return false;
   }
 
+  if (!ConstructTSPTreeSpatial()) {
+    std::cout << "Error: Failed to construct TSP tree" << std::endl;
+    return false;
+  }
+
+
+  /*
   // Use the octrees to construct a TSP tree, write directly to disk
   if (!ConstructTSPTree()) {
     std::cout << "Error: Failed to construct TSP tree" << std::endl;
     return false;
   }
+  */
   
   // Delete temporary file
-  DeleteTempFile();
+  //DeleteTempFile();
 
   return true;
 }
@@ -524,3 +532,172 @@ bool Forge::ConstructTSPTree() {
   return true;
 } 
 
+
+bool Forge::ConstructTSPTreeSpatial() {
+
+  // Make sure temporary file exists
+  if (!boost::filesystem::exists(tempFilename_)) {
+    std::cout << "Error: temp file "<<tempFilename_<<" missing" << std::endl;
+    return false;
+  }
+
+  // Numbers to keep track of
+  unsigned int numOTNodes = nrBricksPerOctree_;
+  unsigned int numBSTNodes = 2*numTimesteps_ - 1;
+  unsigned int numBSTLevels = log(numTimesteps_)/log(2) + 1;
+  unsigned int numBrickVals = 
+    paddedBrickDim_*paddedBrickDim_*paddedBrickDim_;
+
+  std::cout << "Num nodes per OT: " << numOTNodes << std::endl;
+  std::cout << "Num nodes per BST: " << numBSTNodes << std::endl;
+  std::cout << "Num BST levels: " << numBSTLevels << std::endl;
+  std::cout << "Num values per brick: " << numBrickVals << std::endl;
+
+  // Append the temp file to match leaf BST level
+  unsigned int BSTLevel = numBSTLevels - 1;
+
+  std::string newFilename;
+  { // Scoping stringstream
+    std::stringstream ss;
+    ss << BSTLevel;
+    newFilename = tempFilename_ + "." + ss.str();
+    std::cout << "Creating " << newFilename << std::endl;
+    boost::filesystem::rename(tempFilename_, newFilename);
+  }
+
+  // Create one file for every level of the BST tree structure
+  // by averaging the values in the one below.
+
+  // Read two bricks at a time and average
+  std::vector<real> inBuffer1(numBrickVals);
+  std::vector<real> inBuffer2(numBrickVals);
+  std::vector<real> outBuffer(numBrickVals);
+  unsigned int brickSize = numBrickVals * sizeof(real);
+
+  unsigned int numTimestepsInLevel = numTimesteps_;
+  std::string fromFilename = newFilename;
+  std::string toFilename;
+  do {
+
+    std::stringstream ss;
+    ss << BSTLevel - 1;
+    toFilename = tempFilename_ + "." + ss.str();
+    
+    // Init in stream
+    std::fstream in;
+    in.open(fromFilename.c_str(), std::ios_base::in | std::ios_base::binary);
+    if (!in.is_open()) {
+      std::cout << "Error: Could not open " << fromFilename << std::endl;
+      return false;
+    }
+    
+    // Init out stream
+    std::fstream out;
+    out.open(toFilename.c_str(),
+            std::ios_base::out | std::ios_base::binary | std::ios_base::trunc);
+    if (!out.is_open()) {
+      std::cout << "Could not open " << toFilename << " for write"<<std::endl;
+      return false;
+    }
+    std::cout << "Writing to " << toFilename << std::endl;
+
+    for (unsigned int ts=0; ts<numTimestepsInLevel; ts+=2) {
+    
+      unsigned int fromPos1 = ts*numBrickVals;
+      unsigned int fromPos2 = (ts+1)*numBrickVals;
+      unsigned int toPos = ts/2;
+
+      for (unsigned int brick=0; brick<numOTNodes; ++brick) {
+
+        // Read two time steps
+        in.read(reinterpret_cast<char*>(&inBuffer1[0]), brickSize);
+        in.read(reinterpret_cast<char*>(&inBuffer2[0]), brickSize);
+        
+        // Average time steps
+        for (unsigned int i=0; i<outBuffer.size(); ++i) {
+          outBuffer[i] = (inBuffer1[i] + inBuffer2[i]) / static_cast<real>(2);
+        }
+
+        // Write brick
+        out.write(reinterpret_cast<char*>(&outBuffer[0]), brickSize);
+
+      }
+
+    }
+
+    fromFilename = toFilename;
+    in.close();
+    out.close();
+
+    BSTLevel--;
+    numTimestepsInLevel /= 2;
+                
+  } while (BSTLevel != 0);
+
+  // The octrees are now in the temporary files, and all we need to do
+  // is reading them back the right order and write to the output
+
+  // Open out filestream
+  std::fstream out;
+  out.open(tspFilename_.c_str(),
+           std::ios_base::out | std::ios_base::binary | std::ios_base::trunc);
+  if (!out.is_open()) {
+    std::cout << "Error: could not open " << tspFilename_ << std::endl;
+    return false;
+  }
+
+  // Write header
+  out.seekp(std::ios_base::beg);
+  std::cout << "Writing header" << std::endl;
+  // Write header
+  size_t s = sizeof(unsigned int);
+  out.write(reinterpret_cast<char*>(&structure_), s);
+  out.write(reinterpret_cast<char*>(&dataDimensionality_), s);
+  out.write(reinterpret_cast<char*>(&brickDim_), s);
+  out.write(reinterpret_cast<char*>(&brickDim_), s);
+  out.write(reinterpret_cast<char*>(&brickDim_), s);
+  out.write(reinterpret_cast<char*>(&numBricks_), s);
+  out.write(reinterpret_cast<char*>(&numBricks_), s);
+  out.write(reinterpret_cast<char*>(&numBricks_), s);
+  out.write(reinterpret_cast<char*>(&numTimesteps_), s);
+  out.write(reinterpret_cast<char*>(&paddingWidth_), s);
+  out.write(reinterpret_cast<char*>(&dataSize_), s);
+  
+  for (unsigned int level=0; level<numBSTLevels; ++level) {
+  
+    std::cout << "Writing level " << level << " to output" << std::endl;
+
+    std::stringstream ss;
+    ss << level;
+    std::string fromFilename = tempFilename_ + "." + ss.str();
+
+    std::fstream in;
+    in.open(fromFilename.c_str(), std::ios_base::in | std::ios_base::binary);
+    if (!in.is_open()) {
+      std::cout << "Error: Could not open " << fromFilename << std::endl;
+      return false;
+    }
+  
+    // Check file size correctness
+    in.seekg(0, std::ifstream::end);
+    unsigned int realSize = in.tellg();
+    unsigned int numTimesteps = pow(2, level);
+    unsigned int expectedSize = 
+      numBrickVals*numOTNodes*numTimesteps*sizeof(real);
+    if (realSize != expectedSize) {
+      std::cout << "Error: File size not as expected" << std::endl;
+      return false;
+    }
+
+    // Read whole file, write to out file
+    std::vector<real> buffer(realSize/sizeof(real));
+    in.read(reinterpret_cast<char*>(&buffer[0]), realSize);
+    out.write(reinterpret_cast<char*>(&buffer[0]), realSize);
+
+    in.close();
+  }
+
+  out.close();
+
+  return true;
+}
