@@ -560,7 +560,7 @@ bool Forge::ConstructTSPTreeSpatial() {
   { // Scoping stringstream
     std::stringstream ss;
     ss << BSTLevel;
-    newFilename = tempFilename_ + "." + ss.str();
+    newFilename = tempFilename_ + "." + ss.str() + ".tmp";
     std::cout << "Creating " << newFilename << std::endl;
     boost::filesystem::rename(tempFilename_, newFilename);
   }
@@ -581,7 +581,7 @@ bool Forge::ConstructTSPTreeSpatial() {
 
     std::stringstream ss;
     ss << BSTLevel - 1;
-    toFilename = tempFilename_ + "." + ss.str();
+    toFilename = tempFilename_ + "." + ss.str() + ".tmp";
     
     // Init in stream
     std::fstream in;
@@ -669,7 +669,7 @@ bool Forge::ConstructTSPTreeSpatial() {
 
     std::stringstream ss;
     ss << level;
-    std::string fromFilename = tempFilename_ + "." + ss.str();
+    std::string fromFilename = tempFilename_ + "." + ss.str() + ".tmp";
 
     std::fstream in;
     in.open(fromFilename.c_str(), std::ios_base::in | std::ios_base::binary);
