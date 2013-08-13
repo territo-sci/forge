@@ -1,0 +1,10 @@
+in_filename		/home/vsand/OpenSpace/enlil_128_32_sph_diff.vdf
+out_filename		/home/vsand/OpenSpace/enlil_128_32_32_diff.tsp
+
+# Number of voxels (per axis) in bricks
+brick_dimensions	32
+
+# Scaling exponent for errors
+spatial_scaling		0.5
+temporal_scaling	0.25
+

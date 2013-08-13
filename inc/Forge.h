@@ -8,6 +8,7 @@
 
 #include <string>
 #include <vector>
+#include <list>
 #include <fstream>
 
 #define real float
@@ -28,6 +29,8 @@ public:
   void SetStructure(unsigned int _structure);
   void SetBrickDimensions(unsigned int _xBrickDim);
   void SetPaddingWidth(unsigned int _paddingWidth);
+  void SetSpatialScaling(float _spatialScaling);
+  void SetTemporalScaling(float _temporalScaling);
 
   // Do everything!
   bool Construct();
@@ -38,7 +41,12 @@ private:
 
   std::string inFilename_;
   std::string outFilename_;
+  std::string tempFilename_;
+
   std::vector<Brick<real>*> bricks_;
+
+  float spatialScaling_;
+  float temporalScaling_;
 
   // Metadata to be read
   unsigned int structure_;
@@ -54,12 +62,9 @@ private:
   unsigned int nrBricksBaseLevel_;
   unsigned int nrLevels_;
   unsigned int nrBricksPerOctree_;
+  unsigned int nrBricksTotal_;
   unsigned int paddedDim_;
   unsigned int paddedBrickDim_;
-
-  // TODO work in progress
-  const std::string tempFilename_ = "octree.tmp";
-  const std::string tspFilename_ = "/home/vsand/OpenSpace/output.tsp";
 
   // Read metadata
   bool ReadMetadata();
@@ -68,9 +73,25 @@ private:
   // Delete the created temp file
   bool DeleteTempFile();
   // Use temp octrees to create TSP tree
-  bool ConstructTSPTree();
+  //bool ConstructTSPTree();
   // Use temo octrees to create TSP tree (spatial ordering)
   bool ConstructTSPTreeSpatial();
+  // Allocate space, calculate errors and write to file
+  bool CalculateError();
+  // Fill the error array with spatial errors
+  bool CalculateSpatialError();
+  // Fill the error array with temporal errors
+  bool CalculateTemporalError();
+  // Return a list of the leaf bricks that a given brick covers
+  std::list<unsigned int> CoveredLeafBricks(unsigned int _brick);
+
+  enum ErrorIndex {
+    SPATIAL_ERR = 0,
+    TEMPORAL_ERR,
+    NUM_ERR_INDEX
+  };
+
+  std::vector<float> error_;
 
   std::fstream instream_;
 

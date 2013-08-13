@@ -19,8 +19,9 @@ Forge * Forge::New() {
 }
 
 Forge::Forge() 
-  : inFilename_("NotSet"), outFilename_("NotSet"),
-    structure_(0), brickDim_(0), paddingWidth_(0) {
+  : inFilename_("NotSet"), outFilename_("NotSet"), tempFilename_("temp.tmp"),
+    structure_(0), brickDim_(0), paddingWidth_(0), spatialScaling_(1.f),
+    temporalScaling_(1.f) {
 }
 
 Forge::~Forge() {
@@ -49,6 +50,14 @@ void Forge::SetPaddingWidth(unsigned int _paddingWidth) {
   paddingWidth_ = _paddingWidth;
 }
 
+void Forge::SetSpatialScaling(float _spatialScaling) {
+  spatialScaling_ = _spatialScaling;
+}
+
+void Forge::SetTemporalScaling(float _temporalScaling) {
+  temporalScaling_ = _temporalScaling;
+}
+
 bool Forge::Construct() {
 
   // Read metadata 
@@ -69,17 +78,16 @@ bool Forge::Construct() {
     return false;
   }
 
+  // Delete temporary file
+  DeleteTempFile();
 
+  // Calculate errors
   /*
-  // Use the octrees to construct a TSP tree, write directly to disk
-  if (!ConstructTSPTree()) {
-    std::cout << "Error: Failed to construct TSP tree" << std::endl;
+  if (!CalculateError()) {
+    std::cout << "Error: Failed to calculate errors" << std::endl;
     return false;
   }
   */
-  
-  // Delete temporary file
-  //DeleteTempFile();
 
   return true;
 }
@@ -157,12 +165,15 @@ bool Forge::ReadMetadata() {
   nrLevels_ = log(numBricks_)/log(2) + 1;
   // Number of bricks per octree (used for offsets)
   nrBricksPerOctree_ = (pow(8, nrLevels_) - 1) / 7;
+  // Number of bricks total
+  nrBricksTotal_ = nrBricksPerOctree_ * (2*numTimesteps_ - 1);
 
   std::cout << "Number of bricks in base octree level: " 
     << nrBricksBaseLevel_ << std::endl;
   std::cout << "Number of levels in octree: " << nrLevels_ << std::endl;
   std::cout << "Number of bricks in octree: " 
     << nrBricksPerOctree_ << std::endl;
+  std::cout << "Number of bricks total " << nrBricksTotal_ << std::endl;
 
   // Save position of first data entry after header
   headerOffset_ = instream_.tellg();
@@ -171,6 +182,7 @@ bool Forge::ReadMetadata() {
 
   return true;
 }
+
 
 bool Forge::CreateOctree() {
   
@@ -322,8 +334,8 @@ bool Forge::CreateOctree() {
     // Position for first child to average
     unsigned int childPos = 0;
 
-    while (brickPos < nrBricksPerOctree_) {
 
+    while (brickPos < nrBricksPerOctree_) {
       // Filter the eight children and then combine them to build
       // the higher level node
       std::vector<Brick<real>* > filteredChildren(8, NULL);
@@ -386,14 +398,34 @@ uint32_t Forge::ZOrder(uint16_t xPos, uint16_t yPos, uint16_t zPos) {
 
 
 bool Forge::DeleteTempFile() {
+
+  std::cout << "Deleting " << tempFilename_ << std::endl;
   if (boost::filesystem::exists(tempFilename_)) {
     boost::filesystem::remove_all(tempFilename_);
   } else {
     std::cout <<"Warning: " << tempFilename_ << " does not exist" << std::endl;
   }
+
+  unsigned int numBSTLevels = log(numTimesteps_)/log(2) + 1;
+  for (unsigned int level=0; level<numBSTLevels; ++level) {
+
+    std::stringstream ss;
+    ss << level;
+    std::string file = tempFilename_ + "." + ss.str() + ".tmp";
+    std::cout << "Deleting " << file << std::endl;
+
+    if (boost::filesystem::exists(file)) {
+      boost::filesystem::remove_all(file);
+    } else {
+      std::cout <<"Warning: " << file << " does not exist" << std::endl;
+    }
+  
+  }
+
   return true;
 }
 
+/*
 bool Forge::ConstructTSPTree() {
 
   // Make sure the temporary file exists
@@ -466,6 +498,7 @@ bool Forge::ConstructTSPTree() {
     //std::cout << "Level " << level << 
     //  ", starting octree pos: " << octreePos << std::endl;
     
+  unsigned int numBSTLevels = log(numTimesteps_)/log(2) + 1;
     // Loop over all octree nodes in this level
     for (unsigned int i=0; i<bricksPerLevel; ++i) {
 
@@ -531,7 +564,7 @@ bool Forge::ConstructTSPTree() {
 
   return true;
 } 
-
+*/
 
 bool Forge::ConstructTSPTreeSpatial() {
 
@@ -557,24 +590,70 @@ bool Forge::ConstructTSPTreeSpatial() {
   unsigned int BSTLevel = numBSTLevels - 1;
 
   std::string newFilename;
+
   { // Scoping stringstream
     std::stringstream ss;
     ss << BSTLevel;
     newFilename = tempFilename_ + "." + ss.str() + ".tmp";
-    std::cout << "Creating " << newFilename << std::endl;
-    boost::filesystem::rename(tempFilename_, newFilename);
   }
+
+  std::cout << "Creating " << newFilename << std::endl;
+
+  // Create base level temp file by reversing the level order!
+  
+  { // Scoping streams
+
+    // Init in stream
+    std::fstream in;
+    in.open(tempFilename_.c_str(), std::ios_base::in | std::ios_base::binary);
+    if (!in.is_open()) {
+      std::cout << "Error: Could not open " << tempFilename_ << std::endl;
+      return false;
+    }
+    
+    // Init out stream
+    std::fstream out;
+    out.open(newFilename.c_str(),
+            std::ios_base::out | std::ios_base::binary | std::ios_base::trunc);
+    if (!out.is_open()) {
+      std::cout << "Could not open " << newFilename <<" for write"<<std::endl;
+      return false;
+    }
+
+    // Read one octree level at a time, starting from the back of source
+    // Write to out file in reverse order
+
+    // Position at end of file
+    for (unsigned int ts=0; ts<numTimesteps_; ++ts) {
+
+      unsigned int octreePos = (numOTNodes)*numBrickVals*(ts+1);
+      for (unsigned int level=0; level<nrLevels_; ++level) {
+
+        unsigned int bricksPerLevel = pow(8, level);
+        unsigned int valuesPerLevel = numBrickVals*bricksPerLevel;
+        octreePos -= valuesPerLevel;
+        std::vector<real> buffer(valuesPerLevel);
+
+        in.seekg(octreePos*sizeof(real));
+        in.read(
+          reinterpret_cast<char*>(&buffer[0]), valuesPerLevel*sizeof(real));
+        out.write(
+          reinterpret_cast<char*>(&buffer[0]), valuesPerLevel*sizeof(real));
+      }
+
+    }
+
+  } // scoping streams
 
   // Create one file for every level of the BST tree structure
   // by averaging the values in the one below.
-
-  // Read two bricks at a time and average
-  std::vector<real> inBuffer1(numBrickVals);
-  std::vector<real> inBuffer2(numBrickVals);
-  std::vector<real> outBuffer(numBrickVals);
-  unsigned int brickSize = numBrickVals * sizeof(real);
-
   unsigned int numTimestepsInLevel = numTimesteps_;
+  unsigned int numValsInOT = numBrickVals*numOTNodes;
+  std::vector<real> inBuffer1(numValsInOT);
+  std::vector<real> inBuffer2(numValsInOT);
+  std::vector<real> outBuffer(numValsInOT);
+
+  unsigned int OTBytes = numValsInOT * sizeof(real);
   std::string fromFilename = newFilename;
   std::string toFilename;
   do {
@@ -601,27 +680,24 @@ bool Forge::ConstructTSPTreeSpatial() {
     }
     std::cout << "Writing to " << toFilename << std::endl;
 
+    in.seekg(0, std::ifstream::end);
+    unsigned int inSize = in.tellg();
+    std::cout << "In file size " << inSize << " bytes" << std::endl;
+    in.seekg(0, std::ifstream::beg);
+
     for (unsigned int ts=0; ts<numTimestepsInLevel; ts+=2) {
     
-      unsigned int fromPos1 = ts*numBrickVals;
-      unsigned int fromPos2 = (ts+1)*numBrickVals;
-      unsigned int toPos = ts/2;
+      // Read two octrees (two time steps)
+      in.read(reinterpret_cast<char*>(&inBuffer1[0]), OTBytes);
+      in.read(reinterpret_cast<char*>(&inBuffer2[0]), OTBytes);
 
-      for (unsigned int brick=0; brick<numOTNodes; ++brick) {
-
-        // Read two time steps
-        in.read(reinterpret_cast<char*>(&inBuffer1[0]), brickSize);
-        in.read(reinterpret_cast<char*>(&inBuffer2[0]), brickSize);
-        
-        // Average time steps
-        for (unsigned int i=0; i<outBuffer.size(); ++i) {
-          outBuffer[i] = (inBuffer1[i] + inBuffer2[i]) / static_cast<real>(2);
-        }
-
-        // Write brick
-        out.write(reinterpret_cast<char*>(&outBuffer[0]), brickSize);
-
+      // Average time steps
+      for (unsigned int i=0; i<outBuffer.size(); ++i) {
+        outBuffer[i] = (inBuffer1[i] + inBuffer2[i]) / static_cast<real>(2);
       }
+
+      // Write brick
+      out.write(reinterpret_cast<char*>(&outBuffer[0]), OTBytes);
 
     }
 
@@ -639,10 +715,10 @@ bool Forge::ConstructTSPTreeSpatial() {
 
   // Open out filestream
   std::fstream out;
-  out.open(tspFilename_.c_str(),
+  out.open(outFilename_.c_str(),
            std::ios_base::out | std::ios_base::binary | std::ios_base::trunc);
   if (!out.is_open()) {
-    std::cout << "Error: could not open " << tspFilename_ << std::endl;
+    std::cout << "Error: could not open " << outFilename_ << std::endl;
     return false;
   }
 
@@ -670,6 +746,7 @@ bool Forge::ConstructTSPTreeSpatial() {
     std::stringstream ss;
     ss << level;
     std::string fromFilename = tempFilename_ + "." + ss.str() + ".tmp";
+    //std::cout << "Reading from: " << fromFilename << std::endl;
 
     std::fstream in;
     in.open(fromFilename.c_str(), std::ios_base::in | std::ios_base::binary);
@@ -688,11 +765,14 @@ bool Forge::ConstructTSPTreeSpatial() {
       std::cout << "Error: File size not as expected" << std::endl;
       return false;
     }
+    in.seekg(0, std::ifstream::beg);
 
-    // Read whole file, write to out file
     std::vector<real> buffer(realSize/sizeof(real));
+    // Read whole file, write to out file
     in.read(reinterpret_cast<char*>(&buffer[0]), realSize);
-    out.write(reinterpret_cast<char*>(&buffer[0]), realSize);
+
+    out.write(reinterpret_cast<char*>(&buffer[0]), realSize); 
+    std::cout << out.tellp() << std::endl;
 
     in.close();
   }
@@ -701,3 +781,161 @@ bool Forge::ConstructTSPTreeSpatial() {
 
   return true;
 }
+
+bool Forge::CalculateError() {
+
+  // Allocate space
+  error_.resize(nrBricksTotal_*NUM_ERR_INDEX);
+
+  // Fill error array
+  if (!CalculateSpatialError()) {
+    std::cout << "Error: Failed to calculate spatial error" << std::endl;
+    return false;
+  }
+
+  if (!CalculateTemporalError()) {
+    std::cout << "Error: Failed to calculate temporal error" << std::endl;
+    return false;
+  }
+
+  // Write to file
+
+  return true;
+
+}
+
+bool Forge::CalculateSpatialError() {
+
+  unsigned int numBrickVals = paddedBrickDim_*paddedBrickDim_*paddedBrickDim_;
+
+  std::ifstream in;
+  in.open(outFilename_.c_str(), std::ios_base::in | std::ios_base::binary);
+  if (!in.is_open()) {
+    std::cout << "Error: CalculateSpatialError() could not open " << 
+                  outFilename_ << std::endl;
+    return false;
+  }
+
+  std::vector<float> buffer(numBrickVals);
+  std::vector<float> averages(nrBricksTotal_);
+  
+  // First pass: Calculate averages for each brick
+  std::cout << "Spatial error calculation, first pass" << std::endl;
+  for (unsigned int brick=0; brick<nrBricksTotal_; ++brick) {
+
+    // Offset in file
+    std::ios::pos_type offset = headerOffset_ +
+      static_cast<std::ios::pos_type>(brick*numBrickVals*sizeof(float));
+    in.seekg(offset);
+    // Read a brick
+    in.read(reinterpret_cast<char*>(&buffer[0]), sizeof(float)*numBrickVals);
+
+    // Calculate average brick value
+    float avg = 0.f;
+    for (auto it=buffer.begin(); it!=buffer.end(); ++it) {
+      avg += *it;
+    }
+    averages[brick] = avg/static_cast<float>(numBrickVals);
+  }
+
+  // Error stats
+  float minError = 1e20f;
+  float maxError = 0.f;
+  std::vector<float> medianArray(nrBricksTotal_);
+
+  // Second pass: For each brick, compare the covered leaf voxels with
+  // the brick average for a "modified standard deviation"
+  std::cout << "Spatial error calculation, second pass" << std::endl;
+  for (unsigned int brick=0; brick<nrBricksTotal_; ++brick) {
+  
+    float brickAvg = averages[brick];
+    float error = 0.f;
+
+    // Get a list of leaf bricks that the current brick covers
+    std::list<unsigned int> coveredLeafBricks = 
+      CoveredLeafBricks(brick);
+
+    // Calculate modified standard deviation
+    for (auto lb=coveredLeafBricks.begin();
+         lb!=coveredLeafBricks.end(); ++lb) {
+
+      // Read brick
+      std::ios::pos_type offset = headerOffset_ +
+        static_cast<std::ios::pos_type>((*lb)*numBrickVals*sizeof(float));
+      in.seekg(offset);
+      in.read(reinterpret_cast<char*>(&buffer[0]), sizeof(float)*numBrickVals);
+
+      for (auto v=buffer.begin(); v!=buffer.end(); ++v) {
+        error += pow(*v-brickAvg, 2.f);
+      }
+    }
+
+    error = 
+      sqrt(error/static_cast<float>(coveredLeafBricks.size()*numBrickVals));
+  
+    if (error < minError) {
+      minError = error;
+    } else if (error > maxError) {
+      maxError = error;
+    }
+    medianArray[brick] = error;
+
+    // Save error
+    error_[brick*NUM_ERR_INDEX + SPATIAL_ERR] = error;
+  }
+
+  return true;
+}
+
+bool Forge::CalculateTemporalError() {
+  return true;
+}
+
+std::list<unsigned int> Forge::CoveredLeafBricks(unsigned int _brick) {
+  std::list<unsigned int> out;
+  
+  /*
+
+  // Find what octree skeleton node the index belongs to
+  unsigned int OTNode = _brick % numOTNodes_;
+
+  // Find what BST node the index corresponds to using int division
+  unsigned int BSTNode = _brick / numOTNodes_;
+
+  // Calculate BST offset (to translate to root octree)
+  unsigned int BSTOffset = BSTNode * numOTNodes_;
+
+  // Traverse root octree structure to leaves
+  // When visiting the leaves, translate back to correct BST level and save
+  std::queue<unsigned int> queue;
+  queue.push(OTNode);
+  do {
+
+  // Get front of queue and pop it
+  unsigned int toVisit = queue.front();
+  queue.pop();
+
+  // See if the node has children
+  int child = data_[toVisit*NUM_DATA + CHILD_INDEX];
+  if (child == -1) {
+    // Translate back and save
+    out.push_back(toVisit+BSTOffset);
+  } else {
+    // Queue the eight children
+    for (int i=0; i<8; ++i) {
+      queue.push(child+i);
+    }
+  }
+
+  } while (!queue.empty());
+  */
+
+  return out;
+}
+
+
+
+
+
+
+
