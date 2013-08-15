@@ -28,7 +28,9 @@ int main() {
   std::string line;
   std::string inFilename = "notSet";
   std::string outFilename = "notSet";
-  unsigned int brickDimensions = 0;
+  unsigned int xBrickDim = 0;
+  unsigned int yBrickDim = 0;
+  unsigned int zBrickDim = 0;
   float spatialScaling = 0.f;
   float temporalScaling = 0.f;
   while (std::getline(in, line)) {
@@ -45,7 +47,9 @@ int main() {
       } else if (var == "out_filename") {
         ss >> outFilename;
       } else if (var == "brick_dimensions") {
-        ss >> brickDimensions;
+        ss >> xBrickDim;
+        ss >> yBrickDim;
+        ss >> zBrickDim;
       } else if (var == "spatial_scaling") {
         ss >> spatialScaling;
       } else if (var == "temporal_scaling") {
@@ -61,7 +65,8 @@ int main() {
 
   std::cout << "In filename: " << inFilename << std::endl;
   std::cout << "Out filename: " << outFilename << std::endl;
-  std::cout << "Brick dimensions: " << brickDimensions << std::endl;
+  std::cout << "Brick dimensions: " << xBrickDim << " " << yBrickDim 
+    << " " << zBrickDim << std::endl;
   std::cout << "Spatial scaling: " << spatialScaling << std::endl;
   std::cout << "Temporal scaling: " << temporalScaling << std::endl;
 
@@ -69,16 +74,16 @@ int main() {
   
   forge->SetInFilename(inFilename);
   forge->SetOutFilename(outFilename);
-  forge->SetStructure(0); // TODO use for different TSP setups 
-  forge->SetBrickDimensions(brickDimensions);
+  forge->SetBrickDimensions(xBrickDim, yBrickDim, zBrickDim);
   forge->SetSpatialScaling(spatialScaling);
   forge->SetTemporalScaling(temporalScaling);
-  forge->SetPaddingWidth(1);
  
   // Construct TSP tree and calculate errors 
-  if (!forge->Construct()) exit(1);
+  if (!forge->Construct()) { 
+    std::cerr << "Failed to construct TSP tree" << std::endl;
+    exit(1);
+  }
 
   delete forge;
-
   exit(0);
 }

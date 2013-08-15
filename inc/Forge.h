@@ -11,8 +11,6 @@
 #include <list>
 #include <fstream>
 
-#define real float
-
 namespace osp {
   
 class BricksHeader;
@@ -24,15 +22,16 @@ public:
   static Forge * New();
   ~Forge();
 
+  // Setters for various variables
   void SetInFilename(std::string _inFilename);
   void SetOutFilename(std::string _outFilename);
-  void SetStructure(unsigned int _structure);
-  void SetBrickDimensions(unsigned int _xBrickDim);
-  void SetPaddingWidth(unsigned int _paddingWidth);
+  void SetBrickDimensions(unsigned int _xBrickDim,
+                          unsigned int _yBrickDim,
+                          unsigned int _zBrickDim);
   void SetSpatialScaling(float _spatialScaling);
   void SetTemporalScaling(float _temporalScaling);
 
-  // Do everything!
+  // Execute all construction steps
   bool Construct();
 
 private:
@@ -43,28 +42,39 @@ private:
   std::string outFilename_;
   std::string tempFilename_;
 
-  std::vector<Brick<real>*> bricks_;
+  const unsigned int paddingWidth_ = 1;
 
+  std::vector<Brick<float>*> bricks_;
+
+  // Error scaling exponents
   float spatialScaling_;
   float temporalScaling_;
 
-  // Metadata to be read
-  unsigned int structure_;
-  unsigned int dataDimensionality_;
-  unsigned int brickDim_;
-  unsigned int numBricks_;
+  // Data that ends up in the out file
+  unsigned int gridType_;
   unsigned int numTimesteps_;
-  unsigned int dim_;
-  unsigned int paddingWidth_;
+  unsigned int xDim_;
+  unsigned int yDim_;
+  unsigned int zDim_;
+  unsigned int xBrickDim_;
+  unsigned int yBrickDim_;
+  unsigned int zBrickDim_;
+  unsigned int xNumBricks_;
+  unsigned int yNumBricks_;
+  unsigned int zNumBricks_;
   unsigned int dataSize_;
 
   // Additional metadata
-  unsigned int nrBricksBaseLevel_;
-  unsigned int nrLevels_;
-  unsigned int nrBricksPerOctree_;
-  unsigned int nrBricksTotal_;
-  unsigned int paddedDim_;
-  unsigned int paddedBrickDim_;
+  unsigned int numBricksBaseLevel_;
+  unsigned int numLevels_;
+  unsigned int numBricksPerOctree_;
+  unsigned int numBricksTotal_;
+  unsigned int xPaddedDim_;
+  unsigned int yPaddedDim_;
+  unsigned int zPaddedDim_;
+  unsigned int xPaddedBrickDim_;
+  unsigned int yPaddedBrickDim_;
+  unsigned int zPaddedBrickDim_;
 
   // Read metadata
   bool ReadMetadata();
@@ -74,32 +84,16 @@ private:
   bool DeleteTempFile();
   // Use temp octrees to create TSP tree
   //bool ConstructTSPTree();
-  // Use temo octrees to create TSP tree (spatial ordering)
+  // Use temp octrees to create TSP tree (spatial ordering)
   bool ConstructTSPTreeSpatial();
-  // Allocate space, calculate errors and write to file
-  bool CalculateError();
-  // Fill the error array with spatial errors
-  bool CalculateSpatialError();
-  // Fill the error array with temporal errors
-  bool CalculateTemporalError();
-  // Return a list of the leaf bricks that a given brick covers
-  std::list<unsigned int> CoveredLeafBricks(unsigned int _brick);
-
-  enum ErrorIndex {
-    SPATIAL_ERR = 0,
-    TEMPORAL_ERR,
-    NUM_ERR_INDEX
-  };
-
-  std::vector<float> error_;
 
   std::fstream instream_;
 
   // Points to first data entry after header
   std::ios::pos_type headerOffset_;
+
   // Calculate Z-order index from x, y, z coordinates
   uint32_t ZOrder(uint16_t x, uint16_t y, uint16_t z);
-
 
 };
 
