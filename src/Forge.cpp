@@ -100,7 +100,7 @@ bool Forge::Construct() {
   }
 
   // Delete temporary file
-  DeleteTempFile();
+  //DeleteTempFile();
 
   return true;
 }

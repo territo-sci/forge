@@ -1,9 +1,12 @@
 CMakeCache.txt
 cmake_install.cmake
 Makefile
+src/CMakeFiles/
 CMakeFiles/
 Debug/
 data/
+
+ForgeApp
 
 *~
 *.sw*
