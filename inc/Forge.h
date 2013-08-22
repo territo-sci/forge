@@ -1,6 +1,9 @@
 /*
  * Author: Victor Sand (victor.sand@gmail.com)
  *
+ * Forge takes a VDF input file, rearranges and filters the data
+ * to produce a corresponding TSP tree.
+ *
  */
 
 #ifndef FORGE_H_
@@ -9,7 +12,6 @@
 #include <string>
 #include <vector>
 #include <list>
-#include <fstream>
 
 namespace osp {
   
@@ -76,27 +78,22 @@ private:
   unsigned int yPaddedBrickDim_;
   unsigned int zPaddedBrickDim_;
 
-  // Read metadata
+  // Read metadata from VDF file and calculate additional metadata
   bool ReadMetadata();
   // Create an octree for every timestep, save in one common file
   bool CreateOctree();
-  // Delete the created temp file
-  bool DeleteTempFile();
-  // Use temp octrees to create TSP tree
-  //bool ConstructTSPTree();
-  // Use temp octrees to create TSP tree (spatial ordering)
-  bool ConstructTSPTreeSpatial();
-
-  std::fstream instream_;
+  // Delete the created temp files
+  bool DeleteTempFiles();
+  // Use temp octrees to create TSP tree 
+  bool ConstructTSPTree();
 
   // Points to first data entry after header
-  std::ios::pos_type headerOffset_;
+  size_t headerOffset_;
 
   // Calculate Z-order index from x, y, z coordinates
   uint32_t ZOrder(uint16_t x, uint16_t y, uint16_t z);
 
 };
-
 
 }
 
