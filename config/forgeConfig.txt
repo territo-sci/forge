@@ -1,8 +1,8 @@
-in_filename		/home/vsand/OpenSpace/ProcessedData/enlil_64_64_64_256/volume.vdf
-out_filename		/home/vsand/OpenSpace/enlil_64_64_64_256_16.tsp
+in_filename		/media/snabba_disk/OpenSpace/processed_data/enlil_128_1024/volume.vdf
+out_filename		/media/snabba_disk/OpenSpace/processed_data/enlil_128_1024_32.tsp
 
 # Number of voxels per brick (per dimensions)
-brick_dimensions	16 16 16 
+brick_dimensions	32 32 32
 
 # Scaling exponent for errors
 spatial_scaling		0.5

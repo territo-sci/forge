@@ -11,6 +11,7 @@
 #include <math.h>
 #include <array>
 #include <boost/filesystem.hpp>
+#include <stdio.h>
 
 using namespace osp;
 
@@ -230,7 +231,7 @@ bool Forge::CreateOctree() {
   // Loop over all timesteps 
   for (unsigned int i=0; i<numTimesteps_; ++i) {
     
-    std::cout << "Constructing octree for timestep " << i << std::endl;
+    //std::cout << "Constructing octree for timestep " << i << std::endl;
     // Read whole timestep into memory
 
     std::vector<float> timestepData(xDim_*yDim_*zDim_, static_cast<float>(0));
@@ -242,6 +243,10 @@ bool Forge::CreateOctree() {
     in.seekg(timestepOffset);
     // Read data
     in.read(reinterpret_cast<char*>(&timestepData[0]), timestepSize);
+
+    for (auto it=timestepData.begin(); it!=timestepData.end(); ++it) {
+      //std::cout << *it << std::endl;;
+    }
 
     // We now have a non-padded time step, and need to pad the borders.
     // If the padding width is 0, this should result in the same volume as 
@@ -676,7 +681,7 @@ bool Forge::ConstructTSPTreeSpatial() {
   std::vector<float> inBuffer2(numValsInOT);
   std::vector<float> outBuffer(numValsInOT);
 
-  unsigned int OTBytes = numValsInOT * sizeof(float);
+  size_t OTBytes = static_cast<size_t>(numValsInOT * sizeof(float));
   std::string fromFilename = newFilename;
   std::string toFilename;
   do {
@@ -686,13 +691,21 @@ bool Forge::ConstructTSPTreeSpatial() {
     toFilename = tempFilename_ + "." + ss.str() + ".tmp";
     
     // Init in stream
+    /*
     std::fstream in;
     in.open(fromFilename.c_str(), std::ios_base::in | std::ios_base::binary);
     if (!in.is_open()) {
       std::cout << "Error: Could not open " << fromFilename << std::endl;
       return false;
     }
-    
+    */
+
+    std::FILE *inFile = fopen(fromFilename.c_str(), "r");
+    if (!inFile) {
+      std::cerr << "Failed to open " << fromFilename << std::endl;
+      return false;
+    }
+
     // Init out stream
     std::fstream out;
     out.open(toFilename.c_str(),
@@ -702,17 +715,26 @@ bool Forge::ConstructTSPTreeSpatial() {
       return false;
     }
     std::cout << "Writing to " << toFilename << std::endl;
+    std::cout << "From " << fromFilename << std::endl;
 
+    fseek(inFile, 0, SEEK_END);
+    size_t fileSize = ftell(inFile);
+    std::cout << "In file size: " << fileSize << std::endl;
+
+    /*
     in.seekg(0, std::ifstream::end);
     unsigned int inSize = in.tellg();
     std::cout << "In file size " << inSize << " bytes" << std::endl;
     in.seekg(0, std::ifstream::beg);
-
+    */
+  
     for (unsigned int ts=0; ts<numTimestepsInLevel; ts+=2) {
     
       // Read two octrees (two time steps)
-      in.read(reinterpret_cast<char*>(&inBuffer1[0]), OTBytes);
-      in.read(reinterpret_cast<char*>(&inBuffer2[0]), OTBytes);
+      //in.read(reinterpret_cast<char*>(&inBuffer1[0]), OTBytes);
+      //in.read(reinterpret_cast<char*>(&inBuffer2[0]), OTBytes);
+      fread(reinterpret_cast<void*>(&inBuffer1[0]), OTBytes, 1, inFile);
+      fread(reinterpret_cast<void*>(&inBuffer2[0]), OTBytes, 1, inFile);
 
       // Average time steps
       for (unsigned int i=0; i<outBuffer.size(); ++i) {
@@ -725,7 +747,8 @@ bool Forge::ConstructTSPTreeSpatial() {
     }
 
     fromFilename = toFilename;
-    in.close();
+    fclose(inFile);
+    //in.close();
     out.close();
 
     BSTLevel--;
@@ -737,6 +760,7 @@ bool Forge::ConstructTSPTreeSpatial() {
   // is reading them back the right order and write to the output
 
   // Open out filestream
+  /*
   std::fstream out;
   out.open(outFilename_.c_str(),
            std::ios_base::out | std::ios_base::binary | std::ios_base::trunc);
@@ -744,7 +768,16 @@ bool Forge::ConstructTSPTreeSpatial() {
     std::cout << "Error: could not open " << outFilename_ << std::endl;
     return false;
   }
+  */
 
+  std::FILE *outFile = fopen(outFilename_.c_str(), "w");
+  if (!outFile) {
+    std::cerr << "Failed to open for write: " << outFilename_ << std::endl;
+    return false;
+  }
+
+
+  /*
   // Write header
   out.seekp(std::ios_base::beg);
   std::cout << "Writing header" << std::endl;
@@ -759,7 +792,19 @@ bool Forge::ConstructTSPTreeSpatial() {
   out.write(reinterpret_cast<char*>(&yNumBricks_), s);
   out.write(reinterpret_cast<char*>(&zNumBricks_), s);
   out.write(reinterpret_cast<char*>(&dataSize_), s);
+  */
   
+  size_t s = sizeof(unsigned int);
+  fwrite(reinterpret_cast<void*>(&gridType_), s, 1, outFile);
+  fwrite(reinterpret_cast<void*>(&numTimesteps_), s, 1, outFile);
+  fwrite(reinterpret_cast<void*>(&xBrickDim_), s, 1, outFile);
+  fwrite(reinterpret_cast<void*>(&yBrickDim_), s, 1, outFile);
+  fwrite(reinterpret_cast<void*>(&zBrickDim_), s, 1, outFile);
+  fwrite(reinterpret_cast<void*>(&xNumBricks_), s, 1, outFile);
+  fwrite(reinterpret_cast<void*>(&yNumBricks_), s, 1, outFile);
+  fwrite(reinterpret_cast<void*>(&zNumBricks_), s, 1, outFile);
+  fwrite(reinterpret_cast<void*>(&dataSize_), s, 1, outFile);
+
   for (unsigned int level=0; level<numBSTLevels; ++level) {
   
     std::cout << "Writing level " << level << " to output" << std::endl;
@@ -769,13 +814,23 @@ bool Forge::ConstructTSPTreeSpatial() {
     std::string fromFilename = tempFilename_ + "." + ss.str() + ".tmp";
     //std::cout << "Reading from: " << fromFilename << std::endl;
 
+
+    /*
     std::fstream in;
     in.open(fromFilename.c_str(), std::ios_base::in | std::ios_base::binary);
     if (!in.is_open()) {
       std::cout << "Error: Could not open " << fromFilename << std::endl;
       return false;
     }
+    */
+
+    std::FILE *inFile = fopen(fromFilename.c_str(), "r");
+    if (!inFile) {
+      std::cerr << "Failed to open " << fromFilename << std::endl;
+      return false;
+    }
   
+    /*
     // Check file size correctness
     in.seekg(0, std::ifstream::end);
     unsigned int floatSize = in.tellg();
@@ -787,18 +842,102 @@ bool Forge::ConstructTSPTreeSpatial() {
       return false;
     }
     in.seekg(0, std::ifstream::beg);
+    */
 
-    std::vector<float> buffer(floatSize/sizeof(float));
+    fseek(inFile, 0, SEEK_END);
+    size_t inFileSize = ftell(inFile);
+    std::cout << "In file size: " << inFileSize << std::endl;
+    fseek(inFile, 0, SEEK_SET);
+
+
+    std::vector<float> buffer(inFileSize/sizeof(float));
     // Read whole file, write to out file
-    in.read(reinterpret_cast<char*>(&buffer[0]), floatSize);
+    //in.read(reinterpret_cast<char*>(&buffer[0]), floatSize);
+    fread(reinterpret_cast<void*>(&buffer[0]), inFileSize, 1, inFile);
 
-    out.write(reinterpret_cast<char*>(&buffer[0]), floatSize); 
-    std::cout << out.tellp() << std::endl;
+    //out.write(reinterpret_cast<char*>(&buffer[0]), floatSize); 
+    fwrite(reinterpret_cast<void*>(&buffer[0]), inFileSize, 1, outFile);
+    std::cout << "Pos after writing: " << ftell(outFile) << std::endl;
 
-    in.close();
+    fclose(inFile);
+    //in.close();
   }
 
-  out.close();
+  //out.close();
+  fclose(outFile);
+
+  /*
+  { // Scoping stream
+
+    // Do some validation on the out file
+    std::fstream test;
+    test.open(outFilename_.c_str(), std::ios_base::in | std::ios_base::binary);
+    if (!test.is_open()) {
+      std::cout << "Error: could not open test:" << outFilename_ << std::endl;
+      return false;
+    }
+    
+    // Read the header
+    std::cout << "Validating header" << std::endl;
+    unsigned int gridTypeTest, numTimestepsTest, xBrickDimTest,
+      yBrickDimTest, zBrickDimTest, xNumBricksTest, yNumBricksTest,
+      zNumBricksTest, dataSizeTest;
+    test.read(reinterpret_cast<char*>(&gridTypeTest), s);
+    test.read(reinterpret_cast<char*>(&numTimestepsTest), s);
+    test.read(reinterpret_cast<char*>(&xBrickDimTest), s);
+    test.read(reinterpret_cast<char*>(&yBrickDimTest), s);
+    test.read(reinterpret_cast<char*>(&zBrickDimTest), s);
+    test.read(reinterpret_cast<char*>(&xNumBricksTest), s);
+    test.read(reinterpret_cast<char*>(&yNumBricksTest), s);
+    test.read(reinterpret_cast<char*>(&zNumBricksTest), s);
+    test.read(reinterpret_cast<char*>(&dataSizeTest), s);
+
+    if (gridTypeTest != gridType_ ||
+        numTimestepsTest != numTimesteps_ ||
+        xBrickDimTest != xBrickDim_ ||
+        yBrickDimTest != yBrickDim_ ||
+        zBrickDimTest != zBrickDim_ ||
+        xNumBricksTest != xNumBricks_ ||
+        yNumBricksTest != yNumBricks_ ||
+        zNumBricksTest != zNumBricks_ ||
+        dataSizeTest != dataSizeTest) {
+      std::cerr << "\n\nWARNING: Header check failed!\n" << std::endl;
+      std::cout << "Values from file: " << std::endl;
+      std::cout << "Grid type: " << gridTypeTest << std::endl;
+      std::cout << "Number of timesteps: " << numTimestepsTest << std::endl;
+      std::cout << "Brick dimensions: " << xBrickDimTest << " x " 
+                  << yBrickDimTest << " x " << zBrickDimTest << std::endl;
+      std::cout << "Number of bricks: " << xNumBricksTest << " x " 
+                << yNumBricksTest << " x " << zNumBricksTest << std::endl;
+      std::cout << "Data size (bytes): " << dataSizeTest << std::endl;
+    } else {
+      std::cout << "Header OK!" << std::endl;
+    }
+
+    // Read one brick at a time, check for NaN's or inf's
+    std::cout << "Checking " << numBricksTotal_ << " bricks..." << std::endl;
+    std::vector<float> brickBuffer(numBrickVals);
+    for (unsigned int i=0; i<numBricksTotal_; ++i) {
+      test.read(reinterpret_cast<char*>(&brickBuffer[0]), 
+                  sizeof(float)*numBrickVals);
+      for (auto it=brickBuffer.begin(); it!=brickBuffer.end(); ++it) {
+        if (isnan(*it)) {
+          std::cerr << "NaN detected: " << *it << std::endl;
+        } 
+        if (isinf(*it)) {
+          std::cerr << "inf detected: " << *it << std::endl;
+        }
+      }
+    }
+    std::cout << "inf/NaN check complete" << std::endl;
+
+
+    test.close();
+
+  } // Scoping stream
+  */
+  
+
 
   return true;
 }
