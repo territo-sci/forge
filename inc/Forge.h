@@ -9,6 +9,9 @@
 #ifndef FORGE_H_
 #define FORGE_H_
 
+// For easy switching between offset types
+#define off off64_t
+
 #include <string>
 #include <vector>
 #include <list>
@@ -88,7 +91,7 @@ private:
   bool ConstructTSPTree();
 
   // Points to first data entry after header
-  size_t headerOffset_;
+  off headerOffset_;
 
   // Calculate Z-order index from x, y, z coordinates
   uint32_t ZOrder(uint16_t x, uint16_t y, uint16_t z);

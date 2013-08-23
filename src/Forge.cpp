@@ -4,13 +4,14 @@
  * Note: Uses C-style I/O to handle large files. This functionality
  * might be implementation/platform dependent!
  *
+ * Using fseeko/ftello instead of fseek/ftell to ensure 64 bit offsets.
+ *
  */
 
 #include <Forge.h>
 #include <Brick.h>
 #include <iostream>
 #include <sstream>
-//#include <fstream>
 #include <math.h>
 #include <array>
 #include <boost/filesystem.hpp>
@@ -83,9 +84,8 @@ void Forge::SetTemporalScaling(float _temporalScaling) {
 }
 
 bool Forge::Construct() {
-
+  
   // Read metadata from VDF file
-  std::cout << "Reading metadata" << std::endl;
   if (!ReadMetadata()) {
     std::cout << "Error: Could not read metadata" << std::endl;
     return false;
@@ -140,11 +140,13 @@ bool Forge::ReadMetadata() {
 
   // TODO support non-full BST trees. Right now, the number of timesteps
   // needs to be a power of two. Abort if it's not.
+  /*
   if ( (numTimesteps_ & (numTimesteps_-1)) != 0) {
     std::cerr << "ERROR: Number of timesteps not power of two" << std::endl;
     fclose(in);
     return false;
   }
+  */
 
   if (xDim_ % xBrickDim_ != 0 ||
       yDim_ % yBrickDim_ != 0 ||
@@ -204,7 +206,7 @@ bool Forge::ReadMetadata() {
   std::cout << "Number of bricks total " << numBricksTotal_ << std::endl;
 
   // Save position of first data entry after header
-  headerOffset_ = ftell(in);
+  headerOffset_ = ftello(in);
   
   fclose(in);
 
@@ -213,7 +215,7 @@ bool Forge::ReadMetadata() {
 
 
 bool Forge::CreateOctree() {
-  
+
   // Init in and out files
 
   std::FILE *out = fopen(tempFilename_.c_str(), "w");
@@ -229,6 +231,7 @@ bool Forge::CreateOctree() {
     return false;
   }
 
+
   // Loop over all timesteps 
   for (unsigned int i=0; i<numTimesteps_; ++i) {
     
@@ -238,9 +241,9 @@ bool Forge::CreateOctree() {
     std::vector<float> timestepData(xDim_*yDim_*zDim_, static_cast<float>(0));
 
     // Point to the right position in the file stream and read it
-    size_t timestepSize = xDim_*yDim_*zDim_*dataSize_;
-    size_t timestepOffset = static_cast<size_t>(i)*timestepSize+headerOffset_;
-    fseek(in, timestepOffset, SEEK_SET);
+    off timestepSize = xDim_*yDim_*zDim_*dataSize_;
+    off timestepOffset = static_cast<off>(i)*timestepSize+headerOffset_;
+    fseeko(in, timestepOffset, SEEK_SET);
     fread(reinterpret_cast<void*>(&timestepData[0]), timestepSize, 1, in);
 
     // We now have a non-padded time step, and need to pad the borders.
@@ -286,7 +289,6 @@ bool Forge::CreateOctree() {
       }
     }
 
-    std::cout<<"                                             \r"<<std::flush;
 
     // Create a container for the base level bricks.
     std::vector<Brick<float>* > baseLevelBricks(numBricksBaseLevel_, NULL);
@@ -358,7 +360,6 @@ bool Forge::CreateOctree() {
     // Position for first child to average
     unsigned int childPos = 0;
 
-
     while (brickPos < numBricksPerOctree_) {
       // Filter the eight children and then combine them to build
       // the higher level node
@@ -392,6 +393,9 @@ bool Forge::CreateOctree() {
     }
     
   }  
+    
+  std::cout << "Constructing octree for timestep " << numTimesteps_ << "/" 
+    << numTimesteps_ << std::endl;
  
   fclose(in);
   fclose(out);
@@ -597,15 +601,77 @@ bool Forge::ConstructTSPTree() {
 
   // Numbers to keep track of
   unsigned int numOTNodes = numBricksPerOctree_;
-  unsigned int numBSTNodes = 2*numTimesteps_ - 1;
-  unsigned int numBSTLevels = log(numTimesteps_)/log(2) + 1;
   unsigned int numBrickVals = 
     xPaddedBrickDim_*yPaddedBrickDim_*zPaddedBrickDim_;
 
   std::cout << "Num nodes per OT: " << numOTNodes << std::endl;
+  std::cout << "Num values per brick: " << numBrickVals << std::endl;
+
+  // Keep track of the original number of timesteps in case we need to
+  // adjust it. Both the original and the adjusted versions go in the header.
+  unsigned int origNumTimesteps = numTimesteps_;
+
+  // If the number of timesteps is not a power of two, we copy the last 
+  // timestep to make the base level contain a number that is the next
+  // power of two higher than the original number of timesteps
+  bool powTwo = (numTimesteps_ & (numTimesteps_-1)) == 0;
+  if (!powTwo) {
+
+    // Find the next power of two higher than the number of timesteps
+    unsigned int newNumTimesteps =  static_cast<unsigned int>(
+      powf(2.f, ceilf(logf(static_cast<float>(numTimesteps_))/logf(2.f))));
+    unsigned int timesToCopy = newNumTimesteps - numTimesteps_;
+
+    std::cout << "Number of timesteps is not a power of two " << std::endl;
+    std::cout << "Copying the last timestep " << timesToCopy << " times" <<
+      " to get to " << newNumTimesteps << " timesteps " << std::endl; 
+
+    // Read the last timestep
+    size_t timestepSize = numBricksPerOctree_ * numBrickVals * sizeof(float);
+    std::cout << "timestepSize: " << timestepSize << std::endl;
+    off offset = static_cast<off>((numTimesteps_-1)*timestepSize);
+    std::cout << "offset: " << offset << std::endl;
+
+    std::FILE *in = fopen(tempFilename_.c_str(), "r");
+
+    fseeko(in, 0, SEEK_END);
+    off fileSize = ftello(in);
+    std::cout << "File size: " << fileSize << std::endl;
+    std::cout << "File size - timestep size: " << fileSize-timestepSize << std::endl;
+    fseeko(in, offset, SEEK_SET);
+
+    std::vector<float> buffer(timestepSize/sizeof(float));
+
+    fread(reinterpret_cast<void*>(&buffer[0]), timestepSize, 1, in);
+    fclose(in);
+
+    std::FILE *out = fopen(tempFilename_.c_str(), "a+");
+    if (!out) {
+      std::cerr << "Failed to init " << tempFilename_ << std::endl;
+      return false;
+    }
+
+    // Write the extra timesteps at the end of the file
+    fseeko(out, 0, SEEK_END);
+    for (unsigned int i=0; i<timesToCopy; ++i) {
+      fwrite(reinterpret_cast<void*>(&buffer[0]), timestepSize, 1, out);  
+    }
+
+    fclose(out);
+
+    // Use new number in calculations
+    numTimesteps_ = newNumTimesteps;
+
+  } else {
+    std::cout << "Num timesteps is a power of two. Nice!" << std::endl;
+  }
+
+  // More numbers to keep track of
+  unsigned int numBSTNodes = 2*numTimesteps_ - 1;
+  unsigned int numBSTLevels = log(numTimesteps_)/log(2) + 1;
+
   std::cout << "Num nodes per BST: " << numBSTNodes << std::endl;
   std::cout << "Num BST levels: " << numBSTLevels << std::endl;
-  std::cout << "Num values per brick: " << numBrickVals << std::endl;
 
   // Append the temp file to match leaf BST level
   unsigned int BSTLevel = numBSTLevels - 1;
@@ -642,7 +708,7 @@ bool Forge::ConstructTSPTree() {
     // Position at end of file
     for (unsigned int ts=0; ts<numTimesteps_; ++ts) {
 
-      size_t octreePos = static_cast<size_t>((numOTNodes)*numBrickVals*(ts+1));
+      off octreePos=static_cast<off>((numOTNodes)*numBrickVals*(ts+1));
       for (unsigned int level=0; level<numLevels_; ++level) {
 
         unsigned int bricksPerLevel = pow(8, level);
@@ -650,7 +716,7 @@ bool Forge::ConstructTSPTree() {
         octreePos -= valuesPerLevel;
         std::vector<float> buffer(valuesPerLevel);
 
-        fseek(in, octreePos*sizeof(float), SEEK_SET);
+        fseeko(in, octreePos*(off)sizeof(float), SEEK_SET);
         size_t readSize = static_cast<size_t>(valuesPerLevel)*sizeof(float);
         fread(reinterpret_cast<void*>(&buffer[0]), readSize, 1, in);
         fwrite(reinterpret_cast<void*>(&buffer[0]), readSize, 1, out);
@@ -699,8 +765,8 @@ bool Forge::ConstructTSPTree() {
     //std::cout << "Writing to " << toFilename << std::endl;
     //std::cout << "From " << fromFilename << std::endl;
 
-    fseek(in, 0, SEEK_END);
-    size_t fileSize = ftell(in);
+    fseeko(in, 0, SEEK_END);
+    off fileSize = ftello(in);
     //std::cout << "In file size: " << fileSize << std::endl;
 
     for (unsigned int ts=0; ts<numTimestepsInLevel; ts+=2) {
@@ -739,6 +805,7 @@ bool Forge::ConstructTSPTree() {
   std::cout << "Writing header" << std::endl;
   size_t s = sizeof(unsigned int);
   fwrite(reinterpret_cast<void*>(&gridType_), s, 1, out);
+  fwrite(reinterpret_cast<void*>(&origNumTimesteps), s, 1, out);
   fwrite(reinterpret_cast<void*>(&numTimesteps_), s, 1, out);
   fwrite(reinterpret_cast<void*>(&xBrickDim_), s, 1, out);
   fwrite(reinterpret_cast<void*>(&yBrickDim_), s, 1, out);
@@ -746,7 +813,7 @@ bool Forge::ConstructTSPTree() {
   fwrite(reinterpret_cast<void*>(&xNumBricks_), s, 1, out);
   fwrite(reinterpret_cast<void*>(&yNumBricks_), s, 1, out);
   fwrite(reinterpret_cast<void*>(&zNumBricks_), s, 1, out);
-  fwrite(reinterpret_cast<void*>(&dataSize_), s, 1, out);
+  //fwrite(reinterpret_cast<void*>(&dataSize_), s, 1, out);
 
   for (unsigned int level=0; level<numBSTLevels; ++level) {
   
@@ -763,18 +830,20 @@ bool Forge::ConstructTSPTree() {
       return false;
     }
     
-    fseek(in, 0, SEEK_END);
-    size_t inFileSize = ftell(in);
-    fseek(in, 0, SEEK_SET);
+    fseeko(in, 0, SEEK_END);
+    off inFileSize = ftello(in);
+    fseeko(in, 0, SEEK_SET);
     
-    std::vector<float> buffer(inFileSize/sizeof(float));
+    std::vector<float> buffer((size_t)inFileSize/sizeof(float));
     // Read whole file, write to out file
     //in.read(reinterpret_cast<char*>(&buffer[0]), floatSize);
-    fread(reinterpret_cast<void*>(&buffer[0]), inFileSize, 1, in);
+    fread(reinterpret_cast<void*>(&buffer[0]), 
+                                  static_cast<size_t>(inFileSize), 1, in);
 
     //out.write(reinterpret_cast<char*>(&buffer[0]), floatSize); 
-    fwrite(reinterpret_cast<void*>(&buffer[0]), inFileSize, 1, out);
-    //std::cout << "Pos after writing: " << ftell(out) << std::endl;
+    fwrite(reinterpret_cast<void*>(&buffer[0]), 
+                                  static_cast<size_t>(inFileSize), 1, out);
+    //std::cout << "Pos after writing: " << ftello(out) << std::endl;
 
     fclose(in);
   }
