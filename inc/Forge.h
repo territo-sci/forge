@@ -9,6 +9,8 @@
 #ifndef FORGE_H_
 #define FORGE_H_
 
+// Make sure we get 64 bits for offset
+#define _FILE_OFFSET_BITS 64
 // For easy switching between offset types
 #define off off64_t
 
@@ -33,8 +35,6 @@ public:
   void SetBrickDimensions(unsigned int _xBrickDim,
                           unsigned int _yBrickDim,
                           unsigned int _zBrickDim);
-  void SetSpatialScaling(float _spatialScaling);
-  void SetTemporalScaling(float _temporalScaling);
 
   // Execute all construction steps
   bool Construct();
@@ -50,10 +50,6 @@ private:
   const unsigned int paddingWidth_ = 1;
 
   std::vector<Brick<float>*> bricks_;
-
-  // Error scaling exponents
-  float spatialScaling_;
-  float temporalScaling_;
 
   // Data that ends up in the out file
   unsigned int gridType_;

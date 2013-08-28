@@ -31,8 +31,6 @@ int main() {
   unsigned int xBrickDim = 0;
   unsigned int yBrickDim = 0;
   unsigned int zBrickDim = 0;
-  float spatialScaling = 0.f;
-  float temporalScaling = 0.f;
   while (std::getline(in, line)) {
     // Ignore empty lines and comments
     if (!line.empty() && line.at(0) != '#') {
@@ -50,10 +48,6 @@ int main() {
         ss >> xBrickDim;
         ss >> yBrickDim;
         ss >> zBrickDim;
-      } else if (var == "spatial_scaling") {
-        ss >> spatialScaling;
-      } else if (var == "temporal_scaling") {
-        ss >> temporalScaling;
       } else {
         std::cout << "Variable " << var << " not recognized" << std::endl;
         exit(1);
@@ -67,16 +61,12 @@ int main() {
   std::cout << "Out filename: " << outFilename << std::endl;
   std::cout << "Brick dimensions: " << xBrickDim << " " << yBrickDim 
     << " " << zBrickDim << std::endl;
-  std::cout << "Spatial scaling: " << spatialScaling << std::endl;
-  std::cout << "Temporal scaling: " << temporalScaling << std::endl;
 
   Forge* forge = Forge::New();
   
   forge->SetInFilename(inFilename);
   forge->SetOutFilename(outFilename);
   forge->SetBrickDimensions(xBrickDim, yBrickDim, zBrickDim);
-  forge->SetSpatialScaling(spatialScaling);
-  forge->SetTemporalScaling(temporalScaling);
  
   // Construct TSP tree and calculate errors 
   if (!forge->Construct()) { 

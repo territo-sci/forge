@@ -48,9 +48,7 @@ Forge::Forge()
     zPaddedDim_(0),
     xPaddedBrickDim_(0),
     yPaddedBrickDim_(0),
-    zPaddedBrickDim_(0),
-    spatialScaling_(1.f),
-    temporalScaling_(1.f) {
+    zPaddedBrickDim_(0) {
 }
 
 Forge::~Forge() {
@@ -73,14 +71,6 @@ void Forge::SetBrickDimensions(unsigned int _xBrickDim,
   xBrickDim_ = _xBrickDim;
   yBrickDim_ = _yBrickDim;
   zBrickDim_ = _zBrickDim;
-}
-
-void Forge::SetSpatialScaling(float _spatialScaling) {
-  spatialScaling_ = _spatialScaling;
-}
-
-void Forge::SetTemporalScaling(float _temporalScaling) {
-  temporalScaling_ = _temporalScaling;
 }
 
 bool Forge::Construct() {
