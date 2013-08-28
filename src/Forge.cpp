@@ -762,12 +762,13 @@ bool Forge::ConstructTSPTree() {
       return false;
     }
 
-    //std::cout << "Writing to " << toFilename << std::endl;
-    //std::cout << "From " << fromFilename << std::endl;
+    std::cout << "Writing to " << toFilename << std::endl;
+    std::cout << "From " << fromFilename << std::endl;
 
     fseeko(in, 0, SEEK_END);
     off fileSize = ftello(in);
-    //std::cout << "In file size: " << fileSize << std::endl;
+    fseeko(in, 0, SEEK_SET);
+    std::cout << "In file size: " << fileSize << std::endl;
 
     for (unsigned int ts=0; ts<numTimestepsInLevel; ts+=2) {
     
@@ -778,6 +779,11 @@ bool Forge::ConstructTSPTree() {
       // Average time steps
       for (unsigned int i=0; i<outBuffer.size(); ++i) {
         outBuffer[i] = (inBuffer1[i] + inBuffer2[i]) / static_cast<float>(2);
+        /*
+        std::cout << "inBuf1: " << inBuffer1[i] << std::endl;
+        std::cout << "inBuf2: " << inBuffer2[i] << std::endl;
+        std::cout << "outBuf: " << outBuffer[i] << std::endl;
+        */
       }
 
       // Write brick
@@ -822,7 +828,7 @@ bool Forge::ConstructTSPTree() {
     std::stringstream ss;
     ss << level;
     std::string fromFilename = tempFilename_ + "." + ss.str() + ".tmp";
-    //std::cout << "Reading from: " << fromFilename << std::endl;
+    std::cout << "Reading from: " << fromFilename << std::endl;
 
     std::FILE *in = fopen(fromFilename.c_str(), "r");
     if (!in) {
@@ -843,85 +849,78 @@ bool Forge::ConstructTSPTree() {
     //out.write(reinterpret_cast<char*>(&buffer[0]), floatSize); 
     fwrite(reinterpret_cast<void*>(&buffer[0]), 
                                   static_cast<size_t>(inFileSize), 1, out);
-    //std::cout << "Pos after writing: " << ftello(out) << std::endl;
+    std::cout << "Pos after writing: " << ftello(out) << std::endl;
 
     fclose(in);
   }
 
   fclose(out);
 
-  /*
-  { // Scoping stream
-
-    // Do some validation on the out file
-    std::fstream test;
-    test.open(outFilename_.c_str(), std::ios_base::in | std::ios_base::binary);
-    if (!test.is_open()) {
-      std::cout << "Error: could not open test:" << outFilename_ << std::endl;
+  // Do some validation on the out file
+  std::FILE *in = fopen(outFilename_.c_str(), "r");
+  if (!in) {
+    std::cerr << "Failed to open " << outFilename_ << " for validation" 
+      << std::endl;
       return false;
-    }
-    
-    // Read the header
-    std::cout << "Validating header" << std::endl;
-    unsigned int gridTypeTest, numTimestepsTest, xBrickDimTest,
-      yBrickDimTest, zBrickDimTest, xNumBricksTest, yNumBricksTest,
-      zNumBricksTest, dataSizeTest;
-    test.read(reinterpret_cast<char*>(&gridTypeTest), s);
-    test.read(reinterpret_cast<char*>(&numTimestepsTest), s);
-    test.read(reinterpret_cast<char*>(&xBrickDimTest), s);
-    test.read(reinterpret_cast<char*>(&yBrickDimTest), s);
-    test.read(reinterpret_cast<char*>(&zBrickDimTest), s);
-    test.read(reinterpret_cast<char*>(&xNumBricksTest), s);
-    test.read(reinterpret_cast<char*>(&yNumBricksTest), s);
-    test.read(reinterpret_cast<char*>(&zNumBricksTest), s);
-    test.read(reinterpret_cast<char*>(&dataSizeTest), s);
+  } 
 
-    if (gridTypeTest != gridType_ ||
-        numTimestepsTest != numTimesteps_ ||
-        xBrickDimTest != xBrickDim_ ||
-        yBrickDimTest != yBrickDim_ ||
-        zBrickDimTest != zBrickDim_ ||
-        xNumBricksTest != xNumBricks_ ||
-        yNumBricksTest != yNumBricks_ ||
-        zNumBricksTest != zNumBricks_ ||
-        dataSizeTest != dataSizeTest) {
-      std::cerr << "\n\nWARNING: Header check failed!\n" << std::endl;
-      std::cout << "Values from file: " << std::endl;
-      std::cout << "Grid type: " << gridTypeTest << std::endl;
-      std::cout << "Number of timesteps: " << numTimestepsTest << std::endl;
-      std::cout << "Brick dimensions: " << xBrickDimTest << " x " 
-                  << yBrickDimTest << " x " << zBrickDimTest << std::endl;
-      std::cout << "Number of bricks: " << xNumBricksTest << " x " 
-                << yNumBricksTest << " x " << zNumBricksTest << std::endl;
-      std::cout << "Data size (bytes): " << dataSizeTest << std::endl;
-    } else {
-      std::cout << "Header OK!" << std::endl;
-    }
+  unsigned int gridTypeTest, origNumTimestepsTest, 
+    numTimestepsTest, xBrickDimTest,
+    yBrickDimTest, zBrickDimTest, xNumBricksTest, yNumBricksTest,
+    zNumBricksTest; 
+  s = sizeof(unsigned int);
+  fread(reinterpret_cast<void*>(&gridTypeTest), s, 1, in);
+  fread(reinterpret_cast<void*>(&origNumTimestepsTest), s, 1, in);
+  fread(reinterpret_cast<void*>(&numTimestepsTest), s, 1, in);
+  fread(reinterpret_cast<void*>(&xBrickDimTest), s, 1, in);
+  fread(reinterpret_cast<void*>(&yBrickDimTest), s, 1, in);
+  fread(reinterpret_cast<void*>(&zBrickDimTest), s, 1, in);
+  fread(reinterpret_cast<void*>(&xNumBricksTest), s, 1, in);
+  fread(reinterpret_cast<void*>(&yNumBricksTest), s, 1, in);
+  fread(reinterpret_cast<void*>(&zNumBricksTest), s, 1, in);
 
-    // Read one brick at a time, check for NaN's or inf's
-    std::cout << "Checking " << numBricksTotal_ << " bricks..." << std::endl;
-    std::vector<float> brickBuffer(numBrickVals);
-    for (unsigned int i=0; i<numBricksTotal_; ++i) {
-      test.read(reinterpret_cast<char*>(&brickBuffer[0]), 
-                  sizeof(float)*numBrickVals);
-      for (auto it=brickBuffer.begin(); it!=brickBuffer.end(); ++it) {
-        if (isnan(*it)) {
-          std::cerr << "NaN detected: " << *it << std::endl;
-        } 
-        if (isinf(*it)) {
-          std::cerr << "inf detected: " << *it << std::endl;
-        }
-      }
-    }
-    std::cout << "inf/NaN check complete" << std::endl;
+  if (gridTypeTest != gridType_ ||
+      origNumTimestepsTest != origNumTimesteps ||
+      numTimestepsTest != numTimesteps_ ||
+      xBrickDimTest != xBrickDim_ ||
+      yBrickDimTest != yBrickDim_ ||
+      zBrickDimTest != zBrickDim_ ||
+      xNumBricksTest != xNumBricks_ ||
+      yNumBricksTest != yNumBricks_ ||
+      zNumBricksTest != zNumBricks_) {
+    std::cerr << "\n\nWARNING: Header check failed!\n" << std::endl;
+    std::cout << "Values from file: " << std::endl;
+    std::cout << "Grid type: " << gridTypeTest << std::endl;
+    std::cout << "Orig num of timesteps " << origNumTimestepsTest<<std::endl;
+    std::cout << "Number of timesteps: " << numTimestepsTest << std::endl;
+    std::cout << "Brick dimensions: " << xBrickDimTest << " x " 
+                << yBrickDimTest << " x " << zBrickDimTest << std::endl;
+    std::cout << "Number of bricks: " << xNumBricksTest << " x " 
+              << yNumBricksTest << " x " << zNumBricksTest << std::endl;
+  } else {
+    std::cout << "Header OK!" << std::endl;
+  }
 
+  off dataPos = ftello(in);
+  // Check file size
+  fseek(in, 0, SEEK_END);
+  off fileSize = ftello(in);
+  off calcSize = static_cast<off>(numBricksTotal_) *
+                 static_cast<off>(xPaddedBrickDim_*
+                                  yPaddedBrickDim_*
+                                  zPaddedBrickDim_) *
+                 static_cast<off>(sizeof(float)) + dataPos;
+  if (fileSize != calcSize) {
+    std::cerr << "File sizes don't match" << std::endl;
+    std::cerr << "Calculated file size: " << calcSize << std::endl;
+    std::cerr << "Real file size: " << fileSize << std::endl;
+    return false;
+  } else {
+    std::cout << "File sizes OK!" << std::endl;
+  }
+  fseek(in, dataPos, SEEK_SET);
 
-    test.close();
-
-  } // Scoping stream
-  */
-  
-
+  fclose(in);
 
   return true;
 }
