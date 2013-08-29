@@ -77,25 +77,27 @@ bool Forge::Construct() {
   
   // Read metadata from VDF file
   if (!ReadMetadata()) {
-    std::cout << "Error: Could not read metadata" << std::endl;
+    std::cerr << "Error: Could not read metadata" << std::endl;
     return false;
   }
 
   // Create one octree per timestep, save in temporary file
   if (!CreateOctree()) {
-    std::cout << "Error: Failed to create temp octree file" << std::endl;
+    std::cerr << "Error: Failed to create temp octree file" << std::endl;
     return false;
   }
 
   // Construct the TSP tree from the temporary files
   if (!ConstructTSPTree()) {
-    std::cout << "Error: Failed to construct TSP tree" << std::endl;
+    std::cerr << "Error: Failed to construct TSP tree" << std::endl;
     return false;
   }
 
   // Delete temporary files
   if (!DeleteTempFiles()) {
-    std::cout << "Failed to delete temp files, but that's okay" << std::endl;
+    std::cerr << "Failed to delete temp files, but that's okay" << std::endl;
+    std::cerr << "Make sure to clean up the Forge directory manually" <<
+      std::endl;
   }
 
   return true;
@@ -440,147 +442,6 @@ bool Forge::DeleteTempFiles() {
   return true;
 }
 
-/*
-bool Forge::ConstructTSPTree() {
-
-  // Make sure the temporary file exists
-  if (!boost::filesystem::exists(tempFilename_)) {
-    std::cout << "Error: Temp file "<<tempFilename_ <<" missing"<< std::endl;
-    return false;
-  }
-  std::fstream in;
-  in.open(tempFilename_.c_str(), std::ios_base::in | std::ios_base::binary);
-  if (!in.is_open()) {
-    std::cout << "Error: Could not open " << tempFilename_ << std::endl;
-    return false;
-  }
-
-  // Number of nodes in the octree skeleton
-  unsigned int numOctreeNodes = numBricksPerOctree_;
-  std::cout << "Number of nodes per octree " << numOctreeNodes << std::endl;
-
-  // Number of nodes in binary time tree
-  unsigned int numBSTNodes = 2*numTimesteps_ - 1;
-  std::cout << "Num nodes in BST: " << numBSTNodes << std::endl;
-
-  std::fstream out;
-  out.open(tspFilename_.c_str(), 
-           std::ios_base::out | std::ios_base::binary | std::ios_base::trunc);
-  if (!out.is_open()) {
-    std::cout << "Error: could not open " << tspFilename_ << std::endl;
-    return false;
-  }
-  
-  // Write header
-  out.seekp(std::ios_base::beg);
-  std::cout << "Writing header" << std::endl;
-  // Write header
-  size_t s = sizeof(unsigned int);
-  out.write(reinterpret_cast<char*>(&structure_), s);
-  out.write(reinterpret_cast<char*>(&dataDimensionality_), s);
-  out.write(reinterpret_cast<char*>(&brickDim_), s);
-  out.write(reinterpret_cast<char*>(&brickDim_), s);
-  out.write(reinterpret_cast<char*>(&brickDim_), s);
-  out.write(reinterpret_cast<char*>(&numBricks_), s);
-  out.write(reinterpret_cast<char*>(&numBricks_), s);
-  out.write(reinterpret_cast<char*>(&numBricks_), s);
-  out.write(reinterpret_cast<char*>(&numTimesteps_), s);
-  out.write(reinterpret_cast<char*>(&paddingWidth_), s);
-  out.write(reinterpret_cast<char*>(&dataSize_), s);
-
-  std::cout << "Position after writing header: " << out.tellp() << std::endl;
-
-  // Loop over all positions in octree skeleton
-  
-  // Octree level (to both read from and write to)
-  unsigned int level = 0;
-
-  // Number of values in a brick
-  unsigned int brickSize = paddedBrickDim_*paddedBrickDim_*paddedBrickDim_; 
-  std::cout << "Num values in brick " << brickSize << std::endl;
-
-  // Position in octree to read from (starting at first timestep)
-  // Since the octree is constructed from the base level up,
-  // the root is at the last brick index
-  unsigned int octreePos = (numOctreeNodes)*brickSize;
-
-  // Loop over all octree levels (in backwards order)
-  while (level < numLevels_) {
-
-    unsigned int bricksPerLevel = pow(8, level);
-    unsigned int valuesPerLevel = brickSize * bricksPerLevel;
-    octreePos -= valuesPerLevel;
-    //std::cout << "Level " << level << 
-    //  ", starting octree pos: " << octreePos << std::endl;
-    
-  unsigned int numBSTLevels = log(numTimesteps_)/log(2) + 1;
-    // Loop over all octree nodes in this level
-    for (unsigned int i=0; i<bricksPerLevel; ++i) {
-
-      // Allocate bricks for one BST
-      std::vector<Brick<float>* > BSTBricks(numBSTNodes);
-
-      // Starting position in the BST (base level first)
-      // Note that we want the root to be in the front
-      unsigned int BSTBrickPos = numBSTNodes - numTimesteps_;
-
-      // Collect all corresponding bricks from the octree and build the leaves
-      for (unsigned int ts=0; ts<numTimesteps_; ++ts) {
-        Brick<float> *brick = Brick<float>::New(paddedBrickDim_,
-                                              paddedBrickDim_,
-                                              paddedBrickDim_,
-                                              static_cast<float>(0));
-        float *dataPtr = &(brick->data_[0]);
-        size_t s = brickSize*sizeof(float);
-        in.seekg(static_cast<std::ios::pos_type>(
-          (octreePos+ts*numOctreeNodes*brickSize)*sizeof(float)));
-        in.read(reinterpret_cast<char*>(dataPtr), s);
-
-        BSTBricks[BSTBrickPos++] = brick;
-      }
-      // Rewind position
-      BSTBrickPos -= numTimesteps_;
-
-      // Average bricks to build higher levels in BST
-      // This is floatly a reversed level, but it works well for loop purposes
-      unsigned int level = 1;
-      do {
-        // Save position for bricks to average from
-        unsigned int fromPos = BSTBrickPos;
-        // Calculate starting position
-        unsigned int bricksAtLevel = numTimesteps_/(pow(2, level));
-        BSTBrickPos -= bricksAtLevel;
-        // Average bricks 
-        for (int i=0; i<bricksAtLevel; ++i) {
-          BSTBricks[BSTBrickPos] = Brick<float>::Average(BSTBricks[fromPos],
-                                                        BSTBricks[fromPos+1]);
-          BSTBrickPos++;
-          fromPos += 2;
-        }
-        level++;
-        BSTBrickPos -= bricksAtLevel;
-      } while (BSTBrickPos > 0);
-      
-      // Write BST to file
-      unsigned int s = brickSize*sizeof(float);
-      for (auto it=BSTBricks.begin(); it!=BSTBricks.end(); ++it) {
-        out.write(reinterpret_cast<char*>(&(*it)->data_[0]), s);   
-      }
-
-      octreePos += brickSize;
- 
-    }
-    // Rewind
-    octreePos -= valuesPerLevel;
-
-    level++;
-
-  } // while level < numLevels
-
-  return true;
-} 
-*/
-
 bool Forge::ConstructTSPTree() {
 
   // Make sure temporary file exists
@@ -752,13 +613,13 @@ bool Forge::ConstructTSPTree() {
       return false;
     }
 
-    std::cout << "Writing to " << toFilename << std::endl;
-    std::cout << "From " << fromFilename << std::endl;
+    //std::cout << "Writing to " << toFilename << std::endl;
+    //std::cout << "From " << fromFilename << std::endl;
 
     fseeko(in, 0, SEEK_END);
     off fileSize = ftello(in);
     fseeko(in, 0, SEEK_SET);
-    std::cout << "In file size: " << fileSize << std::endl;
+    //std::cout << "In file size: " << fileSize << std::endl;
 
     for (unsigned int ts=0; ts<numTimestepsInLevel; ts+=2) {
     
@@ -818,7 +679,7 @@ bool Forge::ConstructTSPTree() {
     std::stringstream ss;
     ss << level;
     std::string fromFilename = tempFilename_ + "." + ss.str() + ".tmp";
-    std::cout << "Reading from: " << fromFilename << std::endl;
+    //std::cout << "Reading from: " << fromFilename << std::endl;
 
     std::FILE *in = fopen(fromFilename.c_str(), "r");
     if (!in) {
@@ -839,7 +700,7 @@ bool Forge::ConstructTSPTree() {
     //out.write(reinterpret_cast<char*>(&buffer[0]), floatSize); 
     fwrite(reinterpret_cast<void*>(&buffer[0]), 
                                   static_cast<size_t>(inFileSize), 1, out);
-    std::cout << "Pos after writing: " << ftello(out) << std::endl;
+    //std::cout << "Pos after writing: " << ftello(out) << std::endl;
 
     fclose(in);
   }
@@ -909,6 +770,8 @@ bool Forge::ConstructTSPTree() {
     std::cout << "File sizes OK!" << std::endl;
   }
   fseek(in, dataPos, SEEK_SET);
+
+  // TODO check for inf/NaN
 
   fclose(in);
 
