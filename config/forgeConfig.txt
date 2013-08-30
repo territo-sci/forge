@@ -1,6 +1,6 @@
 # In and out filenames (not folders!)
-in_filename		/media/snabba_disk/OpenSpace/processed_data/enlil_128_256/volume.vdf
-out_filename		/media/snabba_disk/OpenSpace/processed_data/enlil_128_256_128.tsp
+in_filename		/media/snabba_disk/OpenSpace/processed_data/enlil_128_1024/volume.vdf
+out_filename		/media/snabba_disk/OpenSpace/processed_data/enlil_128_1024_128.tsp
 
 # Number of voxels per brick (per dimensions) 
 # Need to be of same size and powers of two
