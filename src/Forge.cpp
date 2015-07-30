@@ -646,7 +646,9 @@ bool Forge::ConstructTSPTree() {
 
     fclose(in);
     fclose(out);
-    BSTLevel--;
+    if (BSTLevel > 0) {
+      BSTLevel--;
+    }
     numTimestepsInLevel /= 2;
                 
   } while (BSTLevel != 0);
