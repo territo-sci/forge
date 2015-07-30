@@ -646,7 +646,6 @@ bool Forge::ConstructTSPTree() {
 
     fclose(in);
     fclose(out);
-
     BSTLevel--;
     numTimestepsInLevel /= 2;
                 
@@ -691,16 +690,18 @@ bool Forge::ConstructTSPTree() {
     off inFileSize = ftello(in);
     fseeko(in, 0, SEEK_SET);
     
-    std::vector<float> buffer((size_t)inFileSize/sizeof(float));
-    // Read whole file, write to out file
-    //in.read(reinterpret_cast<char*>(&buffer[0]), floatSize);
-    fread(reinterpret_cast<void*>(&buffer[0]), 
-                                  static_cast<size_t>(inFileSize), 1, in);
+    off chunkSize = 1024 * 1024 * 512; // Write a maximum of 512 MB at a time
+    std::vector<float> buffer((size_t)chunkSize/sizeof(float));
 
-    //out.write(reinterpret_cast<char*>(&buffer[0]), floatSize); 
-    fwrite(reinterpret_cast<void*>(&buffer[0]), 
-                                  static_cast<size_t>(inFileSize), 1, out);
-    //std::cout << "Pos after writing: " << ftello(out) << std::endl;
+    for (off offset = 0; offset < inFileSize; offset += chunkSize) {
+      off thisSize = std::min(chunkSize, inFileSize - offset);
+
+      fread(reinterpret_cast<void*>(&buffer[0]),
+              static_cast<size_t>(thisSize), 1, in);
+
+      fwrite(reinterpret_cast<void*>(&buffer[0]),
+              static_cast<size_t>(thisSize), 1, out);
+    }
 
     fclose(in);
   }
