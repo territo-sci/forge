@@ -17,7 +17,7 @@
 #include <boost/filesystem.hpp>
 #include <stdio.h>
 
-using namespace osp;
+namespace osp {
 
 Forge * Forge::New() {
   return new Forge();
@@ -82,7 +82,7 @@ bool Forge::Construct() {
   }
 
   // Create one octree per timestep, save in temporary file
-  if (!CreateOctree()) {
+  if (!CreateOctrees()) {
     std::cerr << "Error: Failed to create temp octree file" << std::endl;
     return false;
   }
@@ -205,8 +205,7 @@ bool Forge::ReadMetadata() {
   return true;
 }
 
-
-bool Forge::CreateOctree() {
+bool Forge::CreateOctrees() {
 
   // Init in and out files
 
@@ -223,176 +222,210 @@ bool Forge::CreateOctree() {
     return false;
   }
 
-
   // Loop over all timesteps 
-  for (unsigned int i=0; i<numTimesteps_; ++i) {
-    
-    std::cout << "Constructing octree for timestep " << i << "/" 
-      << numTimesteps_ << "\r" << std::flush;
+  for (unsigned int timestep = 0; timestep < numTimesteps_; timestep++) {
+    std::cout << "Constructing octree for timestep " << timestep << "/" << numTimesteps_ << "\r" << std::flush;
 
-    std::vector<float> timestepData(xDim_*yDim_*zDim_, static_cast<float>(0));
+    unsigned int nOctreeLevels = log(numBricksBaseLevel_)/log(8) + 1;
+    std::vector< std::vector<float> > levelData(nOctreeLevels);
 
-    // Point to the right position in the file stream and read it
-    off timestepSize = xDim_*yDim_*zDim_*dataSize_;
-    off timestepOffset = static_cast<off>(i)*timestepSize+headerOffset_;
-    fseeko(in, timestepOffset, SEEK_SET);
-    fread(reinterpret_cast<void*>(&timestepData[0]), timestepSize, 1, in);
-
-    // We now have a non-padded time step, and need to pad the borders.
-    // If the padding width is 0, this should result in the same volume as 
-    // before.
-    std::vector<float> paddedData(xPaddedDim_*yPaddedDim_*zPaddedDim_,
-                                 static_cast<float>(0));
-    // Loop over padded volume that we want to fill
-    // xp -> "x padded"
-    // xo -> "x original"
-    unsigned int xo, yo, zo;
-    for (unsigned int zp=0; zp<zPaddedDim_; ++zp) {
-      for (unsigned int yp=0; yp<yPaddedDim_; ++yp) {
-        for (unsigned int xp=0; xp<xPaddedDim_; ++xp) {
-          
-          if (xp == 0) {
-            xo = xp;
-          } else if (xp == xPaddedDim_-1) {
-            xo = xp-2;
-          } else {
-            xo = xp-1;
-          }
-
-          if (yp == 0) {
-            yo = yp;
-          } else if (yp == yPaddedDim_-1) {
-            yo = yp-2;
-          } else {
-            yo = yp-1;
-          }
-          
-          if (zp == 0) {
-            zo = zp;
-          } else if (zp == zPaddedDim_-1) {
-            zo = zp-2;
-          } else {
-            zo = zp-1;
-          }
-
-          paddedData[xp + yp*xPaddedDim_ + zp*xPaddedDim_*yPaddedDim_] =
-            timestepData[xo + yo*xDim_ + zo*yDim_*zDim_];
-        }
-      }
+    if (!buildDataLevels(in, timestep, levelData)) {
+      std::cerr << std::endl << "Failed to build data levels" << std::endl;
+      return false;
     }
 
-
-    // Create a container for the base level bricks.
-    std::vector<Brick<float>* > baseLevelBricks(numBricksBaseLevel_, NULL);
-
-    // Loop over the volume's subvolumes and create one brick for each
-    for (unsigned int zBrick=0; zBrick<zNumBricks_; ++zBrick) {
-      for (unsigned int yBrick=0; yBrick<yNumBricks_; ++yBrick) {
-        for (unsigned int xBrick=0; xBrick<xNumBricks_; ++xBrick) {
-        
-          Brick<float> *brick = Brick<float>::New(xPaddedBrickDim_, 
-                                                  yPaddedBrickDim_, 
-                                                  zPaddedBrickDim_,
-                                                  static_cast<float>(0));  
-            
-          // Loop over the subvolume's voxels
-          unsigned int xMin = xBrick * xBrickDim_;
-          unsigned int xMax = (xBrick + 1) * xBrickDim_ - 1 + paddingWidth_*2;
-          unsigned int yMin = yBrick * yBrickDim_;
-          unsigned int yMax = (yBrick + 1) * yBrickDim_ - 1 + paddingWidth_*2;
-          unsigned int zMin = zBrick * zBrickDim_;
-          unsigned int zMax = (zBrick + 1) * zBrickDim_ - 1 + paddingWidth_*2;
-          //std::cout << "xmin / xmax " << xMin << " / " << xMax << std::endl;
-          unsigned int zLoc= 0;
-          for (unsigned int zSub=zMin; zSub<=zMax; ++zSub) {
-            unsigned int yLoc = 0;
-            for (unsigned int ySub=yMin; ySub<=yMax; ++ySub) {  
-              unsigned int xLoc = 0;
-              for (unsigned int xSub=xMin; xSub<=xMax; ++xSub) {
-                // Look up global index in full volume
-                unsigned int globalIndex = 
-                  xSub + ySub*xPaddedDim_ + zSub*xPaddedDim_*yPaddedDim_;
-                // Set data at local subvolume index
-                brick->SetData(xLoc, yLoc, zLoc, paddedData[globalIndex]); 
-                xLoc++;
-              }
-              yLoc++;
-            }
-            zLoc++;
-          }
-
-          // Save to base level
-          unsigned int brickIndex = 
-            xBrick + yBrick*xNumBricks_ + zBrick*xNumBricks_*yNumBricks_;
-          baseLevelBricks[brickIndex] = brick;
-        }
-      }
+    std::vector< std::vector<float> > paddedLevelData(nOctreeLevels);
+    if (!createPadding(levelData, paddedLevelData)) {
+      std::cerr << std::endl << "Failed to create padding" << std::endl;
+      return false;
     }
 
-    // Make a container for all the octree bricks
-    std::vector<Brick<float>* > octreeBricks(numBricksPerOctree_);
-    // Use Z-order coordinates to rearrange the base level bricks
-
-    // so that the eight children for each parent node lies
-    // next to each other
-    for (uint16_t z=0; z<static_cast<uint16_t>(xNumBricks_); ++z) { 
-      for (uint16_t y=0; y<static_cast<uint16_t>(yNumBricks_); ++y) {
-        for (uint16_t x=0; x<static_cast<uint16_t>(zNumBricks_); ++x) {
-          unsigned int zOrderIdx = static_cast<unsigned int>(ZOrder(x, y, z));
-          unsigned int idx = x + y*xNumBricks_ + z*xNumBricks_*yNumBricks_;
-          octreeBricks[zOrderIdx] = baseLevelBricks[idx];
-        }
-      }
-    }
-
-    // Construct higher levels of octree
-
-    // Position for next brick, starting at position beyond base level
-    unsigned int brickPos = numBricksBaseLevel_;
-    // Position for first child to average
-    unsigned int childPos = 0;
-
-    while (brickPos < numBricksPerOctree_) {
-      // Filter the eight children and then combine them to build
-      // the higher level node
-      std::vector<Brick<float>* > filteredChildren(8, NULL);
-      unsigned int i=0;
-      for (unsigned int child=childPos; child<childPos+8; ++child) {
-        Brick<float> *filteredChild = 
-          Brick<float>::Filter(octreeBricks[child]);
-        filteredChildren[i++] = filteredChild;
-      }
-      Brick<float> *newBrick = Brick<float>::Combine(filteredChildren);
-      
-      for (auto it=filteredChildren.begin(); it!=filteredChildren.end(); ++it){
-        delete *it;
-        *it = NULL;
-      }
-
-      // Set next child pos
-      childPos += 8;
-
-      // Save new brick
-      octreeBricks[brickPos++] = newBrick;
+    std::vector< Brick<float>* > octreeBricks(numBricksPerOctree_);
+    if (!buildOctree(paddedLevelData, octreeBricks)) {
+      std::cerr << std::endl << "Failed to build octree" << std::endl;
     }
 
     // Write octree to file
-    for (auto it=octreeBricks.begin(); it!=octreeBricks.end(); ++it) {
+    for (auto it = octreeBricks.begin(); it != octreeBricks.end(); it++) {
       fwrite(reinterpret_cast<void*>(&(*it)->data_[0]),
              static_cast<size_t>((*it)->Size()), 1, out);
-      // Free memory when we're done
       delete *it;
+      *it = nullptr;
     }
-    
-  }  
-    
-  std::cout << "Constructing octree for timestep " << numTimesteps_ << "/" 
-    << numTimesteps_ << std::endl;
- 
+  }
+
+  std::cout << "Constructing octree for timestep " << numTimesteps_ << "/" << numTimesteps_ << std::endl;
+
   fclose(in);
   fclose(out);
 
   return true;
+}
+
+
+bool Forge::buildDataLevels(std::FILE* file, unsigned int timestep, std::vector< std::vector<float> >& levelData) {
+  unsigned int nOctreeLevels = levelData.size();
+
+  unsigned int nBaseLevelVoxels = xDim_*yDim_*zDim_;
+  levelData[0].resize(nBaseLevelVoxels);
+
+  off timestepSize = nBaseLevelVoxels * dataSize_;
+  off timestepOffset = static_cast<off>(timestep) * timestepSize + headerOffset_;
+  fseeko(file, timestepOffset, SEEK_SET);
+  fread(reinterpret_cast<void*>(&levelData[0][0]), timestepSize, 1, file);
+
+  glm::ivec3 levelDim(xDim_, yDim_, zDim_);
+  for (unsigned int level = 1; level < nOctreeLevels; level++) {
+    unsigned int childLevel = level - 1;
+    glm::ivec3 childLevelDim = levelDim;
+    levelDim /= 2;
+    unsigned int nLevelVoxels = levelDim.x * levelDim.y * levelDim.z;
+    levelData[level].resize(nLevelVoxels);
+
+    for (int z = 0; z < levelDim.z; z++) {
+      for (int y = 0; y < levelDim.y; y++) {
+        for (int x = 0; x < levelDim.x; x++) {
+          glm::ivec3 voxelPos(x, y, z);
+
+          float voxelData = 0.0;
+          for (int childZ = 0; childZ < 2; childZ++) {
+            for (int childY = 0; childY < 2; childY++) {
+              for (int childX = 0; childX < 2; childX++) {
+                glm::ivec3 localChildPos(childX, childY, childZ);
+                glm::ivec3 childPos = voxelPos * 2 + localChildPos;
+                unsigned int childVoxelIndex = cartesianToLinear(childPos, childLevelDim);
+                voxelData += levelData[childLevel][childVoxelIndex];
+              }
+            }
+          }
+          voxelData /= 8.0;
+
+          unsigned int voxelIndex = cartesianToLinear(voxelPos, levelDim);
+          levelData[level][voxelIndex] = voxelData;
+        }
+      }
+    }
+  }
+
+  return true;
+}
+
+bool Forge::createPadding(std::vector< std::vector<float> >& levelData, std::vector< std::vector<float> >& paddedLevelData) {
+  unsigned int nOctreeLevels = log(numBricksBaseLevel_)/log(8) + 1;
+
+  if (levelData.size() != nOctreeLevels || paddedLevelData.size() != nOctreeLevels) {
+    return false;
+  }
+
+  glm::ivec3 paddingOffset(paddingWidth_);
+  glm::ivec3 levelDim(xDim_, yDim_, zDim_);
+
+  for (unsigned int level = 0; level < nOctreeLevels; level++) {
+    glm::ivec3 paddedLevelDim = levelDim + paddingOffset * 2;
+    unsigned int nPaddedLevelVoxels = paddedLevelDim.x * paddedLevelDim.y * paddedLevelDim.z;
+    paddedLevelData[level].resize(nPaddedLevelVoxels);
+
+    for (int z = 0; z < paddedLevelDim.z; z++) {
+      for (int y = 0; y < paddedLevelDim.y; y++) {
+        for (int x = 0; x < paddedLevelDim.x; x++) {
+          glm::ivec3 paddedLevelVoxelPos(x, y, z);
+          unsigned int paddedLevelVoxel = cartesianToLinear(paddedLevelVoxelPos, paddedLevelDim);
+
+          glm::ivec3 samplePos = paddedLevelVoxelPos - paddingOffset;
+          samplePos.x = glm::clamp(samplePos.x, 0, levelDim.x - 1);
+          samplePos.y = glm::clamp(samplePos.y, 0, levelDim.y - 1);
+          samplePos.z = glm::clamp(samplePos.z, 0, levelDim.z - 1);
+
+          unsigned int levelVoxel = cartesianToLinear(samplePos, levelDim);
+          paddedLevelData[level][paddedLevelVoxel] = levelData[level][levelVoxel];
+        }
+      }
+    }
+
+    levelDim /= 2;
+  }
+
+  return true;
+}
+
+bool Forge::buildOctree(std::vector< std::vector<float> >& paddedLevelData, std::vector< Brick<float>* >& octreeBricks) {
+  unsigned int maxLevel = paddedLevelData.size() - 1;
+  unsigned int maxDepth = maxLevel;
+
+  glm::ivec3 paddingOffset(paddingWidth_);
+  glm::ivec3 brickDim(xBrickDim_, yBrickDim_, zBrickDim_);
+  glm::ivec3 paddedBrickDim = brickDim + 2 * paddingOffset;
+
+  unsigned int levelOffset = 0;
+
+  for (unsigned int level = 0; level <= maxLevel; level++) {
+    unsigned int depth = maxLevel - level;
+    unsigned int nBricksPerDim = pow(2, depth);
+
+    glm::ivec3 paddedLevelDataDim = brickDim;
+    paddedLevelDataDim.x *= nBricksPerDim;
+    paddedLevelDataDim.y *= nBricksPerDim;
+    paddedLevelDataDim.z *= nBricksPerDim;
+    paddedLevelDataDim += paddingOffset * 2;
+
+    for (int brickZ = 0; brickZ < nBricksPerDim; brickZ++) {
+      for (int brickY = 0; brickY < nBricksPerDim; brickY++) {
+        for (int brickX = 0; brickX < nBricksPerDim; brickX++) {
+          glm::ivec3 brickPos(brickX, brickY, brickZ);
+          glm::ivec3 brickOffset = brickPos * brickDim;
+
+          Brick<float> *brick = Brick<float>::New(paddedBrickDim.x, paddedBrickDim.y, paddedBrickDim.z, static_cast<float>(0));
+
+          for (int voxelZ = 0; voxelZ < paddedBrickDim.z; voxelZ++) {
+            for (int voxelY = 0; voxelY < paddedBrickDim.y; voxelY++) {
+              for (int voxelX = 0; voxelX < paddedBrickDim.x; voxelX++) {
+                glm::ivec3 voxelPos(voxelX, voxelY, voxelZ);
+                glm::ivec3 voxelOffset = brickOffset + voxelPos;
+                unsigned int voxel = cartesianToLinear(voxelOffset, paddedLevelDataDim);
+                brick->SetData(voxelPos.x, voxelPos.y, voxelPos.z, paddedLevelData[level][voxel]);
+              }
+            }
+          }
+
+          unsigned int zOrderIdx = static_cast<unsigned int>(ZOrder(brickX, brickY, brickZ));
+          unsigned int brickIndex = levelOffset + zOrderIdx;
+          octreeBricks[brickIndex] = brick;
+        }
+      }
+    }
+
+    unsigned int nBricksInLevel = nBricksPerDim*nBricksPerDim*nBricksPerDim;
+    levelOffset += nBricksInLevel;
+  }
+
+  return true;
+}
+
+glm::ivec3 Forge::linearToCartesian(unsigned int linearCoords, int dim) {
+  return linearToCartesian(linearCoords, dim, dim, dim);
+}
+
+glm::ivec3 Forge::linearToCartesian(unsigned int linearCoords, int xDim, int yDim, int zDim) {
+  return linearToCartesian(linearCoords, glm::ivec3(xDim, yDim, zDim));
+}
+
+glm::ivec3 Forge::linearToCartesian(unsigned int linearCoords, glm::ivec3 dim) {
+  int z = linearCoords / (dim.x*dim.y);
+  int y = (linearCoords / dim.x) % dim.y;
+  int x = linearCoords % dim.x;
+  return glm::ivec3(x, y, z);
+}
+
+unsigned int Forge::cartesianToLinear(glm::ivec3 cartesianCoords, int dim) {
+  return cartesianToLinear(cartesianCoords, dim, dim, dim);
+}
+
+unsigned int Forge::cartesianToLinear(glm::ivec3 cartesianCoords, int xDim, int yDim, int zDim) {
+  return cartesianToLinear(cartesianCoords, glm::ivec3(xDim, yDim, zDim));
+}
+
+unsigned int Forge::cartesianToLinear(glm::ivec3 cartesianCoords, glm::ivec3 dim) {
+  return cartesianCoords.x + cartesianCoords.y*dim.x + cartesianCoords.z*dim.x*dim.y;
 }
 
 // Adapted from  http://graphics.stanford.edu/~seander/bithacks.htm
@@ -781,6 +814,6 @@ bool Forge::ConstructTSPTree() {
   return true;
 }
 
-
+} // namespace osp
 
 
