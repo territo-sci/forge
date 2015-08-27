@@ -18,6 +18,8 @@
 #include <vector>
 #include <list>
 
+#include <glm/glm.hpp>
+
 namespace osp {
   
 class BricksHeader;
@@ -80,7 +82,7 @@ private:
   // Read metadata from VDF file and calculate additional metadata
   bool ReadMetadata();
   // Create an octree for every timestep, save in one common file
-  bool CreateOctree();
+  bool CreateOctrees();
   // Delete the created temp files
   bool DeleteTempFiles();
   // Use temp octrees to create TSP tree 
@@ -89,12 +91,23 @@ private:
   // Points to first data entry after header
   off headerOffset_;
 
+  bool buildDataLevels(std::FILE* file, unsigned int timestep, std::vector< std::vector<float> >& levelData);
+  bool createPadding(std::vector< std::vector<float> >& levelData, std::vector< std::vector<float> >& paddedLevelData);
+  bool buildOctree(std::vector< std::vector<float> >& paddedLevelData, std::vector< Brick<float>* >& octreeBricks);
+
   // Calculate Z-order index from x, y, z coordinates
   uint32_t ZOrder(uint16_t x, uint16_t y, uint16_t z);
 
+  glm::ivec3 linearToCartesian(unsigned int linearCoords, int dim);
+  glm::ivec3 linearToCartesian(unsigned int linearCoords, int xDim, int yDim, int zDim);
+  glm::ivec3 linearToCartesian(unsigned int linearCoords, glm::ivec3 dim);
+  unsigned int cartesianToLinear(glm::ivec3 cartesianCoords, int dim);
+  unsigned int cartesianToLinear(glm::ivec3 cartesianCoords, int xDim, int yDim, int zDim);
+  unsigned int cartesianToLinear(glm::ivec3 cartesianCoords, glm::ivec3 dim);
+
 };
 
-}
+} // namespace osp
 
 #endif
 
