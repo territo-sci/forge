@@ -132,13 +132,6 @@ bool Forge::ReadMetadata() {
 
   // TODO support non-full BST trees. Right now, the number of timesteps
   // needs to be a power of two. Abort if it's not.
-  /*
-  if ( (numTimesteps_ & (numTimesteps_-1)) != 0) {
-    std::cerr << "ERROR: Number of timesteps not power of two" << std::endl;
-    fclose(in);
-    return false;
-  }
-  */
 
   if (xDim_ % xBrickDim_ != 0 ||
       yDim_ % yBrickDim_ != 0 ||
@@ -645,12 +638,8 @@ bool Forge::ConstructTSPTree() {
       return false;
     }
 
-    //std::cout << "Writing to " << toFilename << std::endl;
-    //std::cout << "From " << fromFilename << std::endl;
-
     fseeko(in, 0, SEEK_END);
     fseeko(in, 0, SEEK_SET);
-    //std::cout << "In file size: " << fileSize << std::endl;
 
     for (unsigned int ts=0; ts<numTimestepsInLevel; ts+=2) {
     
@@ -661,11 +650,6 @@ bool Forge::ConstructTSPTree() {
       // Average time steps
       for (unsigned int i=0; i<outBuffer.size(); ++i) {
         outBuffer[i] = (inBuffer1[i] + inBuffer2[i]) / static_cast<float>(2);
-        /*
-        std::cout << "inBuf1: " << inBuffer1[i] << std::endl;
-        std::cout << "inBuf2: " << inBuffer2[i] << std::endl;
-        std::cout << "outBuf: " << outBuffer[i] << std::endl;
-        */
       }
 
       // Write brick
@@ -702,7 +686,6 @@ bool Forge::ConstructTSPTree() {
   fwrite(reinterpret_cast<void*>(&xNumBricks_), s, 1, out);
   fwrite(reinterpret_cast<void*>(&yNumBricks_), s, 1, out);
   fwrite(reinterpret_cast<void*>(&zNumBricks_), s, 1, out);
-  //fwrite(reinterpret_cast<void*>(&dataSize_), s, 1, out);
 
   for (unsigned int level=0; level<numBSTLevels; ++level) {
   
@@ -711,7 +694,6 @@ bool Forge::ConstructTSPTree() {
     std::stringstream ss;
     ss << level;
     std::string fromFilename = tempFilename_ + "." + ss.str() + ".tmp";
-    //std::cout << "Reading from: " << fromFilename << std::endl;
 
     std::FILE *in = fopen(fromFilename.c_str(), "r");
     if (!in) {
