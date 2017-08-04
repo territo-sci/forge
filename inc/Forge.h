@@ -11,8 +11,6 @@
 
 // Make sure we get 64 bits for offset
 #define _FILE_OFFSET_BITS 64
-// For easy switching between offset types
-#define off off64_t
 
 #include <string>
 #include <vector>
@@ -89,7 +87,7 @@ private:
   bool ConstructTSPTree();
 
   // Points to first data entry after header
-  off headerOffset_;
+  size_t headerOffset_;
 
   bool buildDataLevels(std::FILE* file, unsigned int timestep, std::vector< std::vector<float> >& levelData);
   bool createPadding(std::vector< std::vector<float> >& levelData, std::vector< std::vector<float> >& paddedLevelData);

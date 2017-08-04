@@ -269,8 +269,8 @@ bool Forge::buildDataLevels(std::FILE* file, unsigned int timestep, std::vector<
   unsigned int nBaseLevelVoxels = xDim_*yDim_*zDim_;
   levelData[0].resize(nBaseLevelVoxels);
 
-  off timestepSize = nBaseLevelVoxels * dataSize_;
-  off timestepOffset = static_cast<off>(timestep) * timestepSize + headerOffset_;
+  size_t timestepSize = nBaseLevelVoxels * dataSize_;
+  size_t timestepOffset = static_cast<size_t>(timestep) * timestepSize + headerOffset_;
   fseeko(file, timestepOffset, SEEK_SET);
   fread(reinterpret_cast<void*>(&levelData[0][0]), timestepSize, 1, file);
 
@@ -513,13 +513,13 @@ bool Forge::ConstructTSPTree() {
     // Read the last timestep
     size_t timestepSize = numBricksPerOctree_ * numBrickVals * sizeof(float);
     std::cout << "timestepSize: " << timestepSize << std::endl;
-    off offset = static_cast<off>((numTimesteps_-1)*timestepSize);
+    size_t offset = static_cast<size_t>((numTimesteps_-1)*timestepSize);
     std::cout << "offset: " << offset << std::endl;
 
     std::FILE *in = fopen(tempFilename_.c_str(), "r");
 
     fseeko(in, 0, SEEK_END);
-    off fileSize = ftello(in);
+    size_t fileSize = ftello(in);
     std::cout << "File size: " << fileSize << std::endl;
     std::cout << "File size - timestep size: " << fileSize-timestepSize << std::endl;
     fseeko(in, offset, SEEK_SET);
@@ -592,7 +592,7 @@ bool Forge::ConstructTSPTree() {
     // Position at end of file
     for (unsigned int ts=0; ts<numTimesteps_; ++ts) {
 
-      off octreePos=static_cast<off>((numOTNodes)*numBrickVals*(ts+1));
+      size_t octreePos=static_cast<size_t>((numOTNodes)*numBrickVals*(ts+1));
       for (unsigned int level=0; level<numLevels_; ++level) {
 
         unsigned int bricksPerLevel = pow(8, level);
@@ -600,7 +600,7 @@ bool Forge::ConstructTSPTree() {
         octreePos -= valuesPerLevel;
         std::vector<float> buffer(valuesPerLevel);
 
-        fseeko(in, octreePos*(off)sizeof(float), SEEK_SET);
+        fseeko(in, octreePos*(size_t)sizeof(float), SEEK_SET);
         size_t readSize = static_cast<size_t>(valuesPerLevel)*sizeof(float);
         fread(reinterpret_cast<void*>(&buffer[0]), readSize, 1, in);
         fwrite(reinterpret_cast<void*>(&buffer[0]), readSize, 1, out);
@@ -650,7 +650,7 @@ bool Forge::ConstructTSPTree() {
     //std::cout << "From " << fromFilename << std::endl;
 
     fseeko(in, 0, SEEK_END);
-    off fileSize = ftello(in);
+    size_t fileSize = ftello(in);
     fseeko(in, 0, SEEK_SET);
     //std::cout << "In file size: " << fileSize << std::endl;
 
@@ -722,14 +722,14 @@ bool Forge::ConstructTSPTree() {
     }
     
     fseeko(in, 0, SEEK_END);
-    off inFileSize = ftello(in);
+    size_t inFileSize = ftello(in);
     fseeko(in, 0, SEEK_SET);
     
-    off chunkSize = 1024 * 1024 * 512; // Write a maximum of 512 MB at a time
+    size_t chunkSize = 1024 * 1024 * 512; // Write a maximum of 512 MB at a time
     std::vector<float> buffer((size_t)chunkSize/sizeof(float));
 
-    for (off offset = 0; offset < inFileSize; offset += chunkSize) {
-      off thisSize = std::min(chunkSize, inFileSize - offset);
+    for (size_t offset = 0; offset < inFileSize; offset += chunkSize) {
+      size_t thisSize = std::min(chunkSize, inFileSize - offset);
 
       fread(reinterpret_cast<void*>(&buffer[0]),
               static_cast<size_t>(thisSize), 1, in);
@@ -788,15 +788,15 @@ bool Forge::ConstructTSPTree() {
     std::cout << "Header OK!" << std::endl;
   }
 
-  off dataPos = ftello(in);
+  size_t dataPos = ftello(in);
   // Check file size
   fseek(in, 0, SEEK_END);
-  off fileSize = ftello(in);
-  off calcSize = static_cast<off>(numBricksTotal_) *
-                 static_cast<off>(xPaddedBrickDim_*
+  size_t fileSize = ftello(in);
+  size_t calcSize = static_cast<size_t>(numBricksTotal_) *
+                 static_cast<size_t>(xPaddedBrickDim_*
                                   yPaddedBrickDim_*
                                   zPaddedBrickDim_) *
-                 static_cast<off>(sizeof(float)) + dataPos;
+                 static_cast<size_t>(sizeof(float)) + dataPos;
   if (fileSize != calcSize) {
     std::cerr << "File sizes don't match" << std::endl;
     std::cerr << "Calculated file size: " << calcSize << std::endl;
