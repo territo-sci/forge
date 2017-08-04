@@ -350,7 +350,6 @@ bool Forge::createPadding(std::vector< std::vector<float> >& levelData, std::vec
 
 bool Forge::buildOctree(std::vector< std::vector<float> >& paddedLevelData, std::vector< Brick<float>* >& octreeBricks) {
   unsigned int maxLevel = paddedLevelData.size() - 1;
-  unsigned int maxDepth = maxLevel;
 
   glm::ivec3 paddingOffset(paddingWidth_);
   glm::ivec3 brickDim(xBrickDim_, yBrickDim_, zBrickDim_);
@@ -650,7 +649,6 @@ bool Forge::ConstructTSPTree() {
     //std::cout << "From " << fromFilename << std::endl;
 
     fseeko(in, 0, SEEK_END);
-    size_t fileSize = ftello(in);
     fseeko(in, 0, SEEK_SET);
     //std::cout << "In file size: " << fileSize << std::endl;
 
