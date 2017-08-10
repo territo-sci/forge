@@ -25,7 +25,7 @@ Forge *Forge::New() {
 
 Forge::Forge()
 : inFilename_("NotSet")
-, outFilename_("NotSet"),
+, outFilename_("NotSet")
 , tempFilename_("temp.tmp")
 , gridType_(0)
 , numTimesteps_(0)
