@@ -5,6 +5,8 @@ src/CMakeFiles/
 CMakeFiles/
 Debug/
 data/
+.idea/
+cmake-build-debug/
 
 ForgeApp
 
