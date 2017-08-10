@@ -10,12 +10,9 @@
 
 #include <Forge.h>
 #include <Brick.h>
-#include <iostream>
 #include <sstream>
-#include <math.h>
 #include <array>
 #include <boost/filesystem.hpp>
-#include <stdio.h>
 
 namespace osp {
 
@@ -696,7 +693,7 @@ bool Forge::ConstructTSPTree() {
 
         std::stringstream ss;
         ss << level;
-        std::string fromFilename = tempFilename_ + "." + ss.str() + ".tmp";
+        fromFilename= tempFilename_ + "." + ss.str() + ".tmp";
 
         std::FILE *in = fopen(fromFilename.c_str(), "r");
         if (!in) {
@@ -785,9 +782,10 @@ bool Forge::ConstructTSPTree() {
         std::cerr << "Calculated file size: " << calcSize << std::endl;
         std::cerr << "Real file size: " << fileSize << std::endl;
         return false;
-    } else {
-        std::cout << "File sizes OK!" << std::endl;
     }
+
+    std::cout << "File sizes OK!" << std::endl;
+
     fseek(in, dataPos, SEEK_SET);
 
     // TODO check for inf/NaN
