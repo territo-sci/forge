@@ -4,20 +4,48 @@
  */
 
 #include <Forge.h>
-#include <string>
 #include <cstdlib>
 #include <fstream>
 #include <sstream>
 #include <iostream>
+#include <boost/program_options.hpp>
+
 
 using namespace osp;
 
-int main() {
+namespace ForgeApp {
+namespace options {
+  boost::program_options::variables_map opts;
+  const char* CONFIG  = "config";
+  const char* HELP    = "help";
+} // namespace options
+} // namespace FurnaceApp
 
+namespace options = boost::program_options;
+
+
+void parseOptions(int ac, char* av[], options::variables_map &vm) {
+  options::options_description desc("Options");
+  desc.add_options()
+          (ForgeApp::options::CONFIG, options::value<std::string>(), "configuration file")
+          (ForgeApp::options::HELP, "print help")
+          ;
+
+  options::store(options::parse_command_line(ac, av, desc), vm);
+}
+
+int main(int ac, char* av[]) {
 
   // Very simple and short config file
   // TODO nicer implementation
   std::string config = "config/forgeConfig.txt";
+
+  parseOptions(ac, av, ForgeApp::options::opts);
+
+  if(ForgeApp::options::opts.count(ForgeApp::options::CONFIG)) {
+    config = ForgeApp::options::opts[ForgeApp::options::CONFIG].as<std::string>();
+  }
+
   std::ifstream in;
   in.open(config.c_str(), std::ifstream::in);
   if (!in.is_open()) {
