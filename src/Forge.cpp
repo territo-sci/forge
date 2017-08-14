@@ -121,11 +121,11 @@ bool Forge::ReadMetadata() {
     }
 
     size_t s = sizeof(size_t);
-    fread(reinterpret_cast<void *>(&gridType_), s, 1, in);
-    fread(reinterpret_cast<void *>(&numTimesteps_), s, 1, in);
-    fread(reinterpret_cast<void *>(&xDim_), s, 1, in);
-    fread(reinterpret_cast<void *>(&yDim_), s, 1, in);
-    fread(reinterpret_cast<void *>(&zDim_), s, 1, in);
+    fread(&gridType_, s, 1, in);
+    fread(&numTimesteps_, s, 1, in);
+    fread(&xDim_, s, 1, in);
+    fread(&yDim_, s, 1, in);
+    fread(&zDim_, s, 1, in);
 
     // TODO support non-full BST trees. Right now, the number of timesteps
     // needs to be a power of two. Abort if it's not.
@@ -736,15 +736,15 @@ bool Forge::ConstructTSPTree() {
             yBrickDimTest, zBrickDimTest, xNumBricksTest, yNumBricksTest,
             zNumBricksTest;
     s = sizeof(size_t);
-    fread(reinterpret_cast<void *>(&gridTypeTest), s, 1, in);
-    fread(reinterpret_cast<void *>(&origNumTimestepsTest), s, 1, in);
-    fread(reinterpret_cast<void *>(&numTimestepsTest), s, 1, in);
-    fread(reinterpret_cast<void *>(&xBrickDimTest), s, 1, in);
-    fread(reinterpret_cast<void *>(&yBrickDimTest), s, 1, in);
-    fread(reinterpret_cast<void *>(&zBrickDimTest), s, 1, in);
-    fread(reinterpret_cast<void *>(&xNumBricksTest), s, 1, in);
-    fread(reinterpret_cast<void *>(&yNumBricksTest), s, 1, in);
-    fread(reinterpret_cast<void *>(&zNumBricksTest), s, 1, in);
+    fread(&gridTypeTest, s, 1, in);
+    fread(&origNumTimestepsTest, s, 1, in);
+    fread(&numTimestepsTest, s, 1, in);
+    fread(&xBrickDimTest, s, 1, in);
+    fread(&yBrickDimTest, s, 1, in);
+    fread(&zBrickDimTest, s, 1, in);
+    fread(&xNumBricksTest, s, 1, in);
+    fread(&yNumBricksTest, s, 1, in);
+    fread(&zNumBricksTest, s, 1, in);
 
     if (gridTypeTest != gridType_ ||
         origNumTimestepsTest != origNumTimesteps ||
