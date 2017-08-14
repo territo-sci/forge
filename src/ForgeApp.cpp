@@ -54,9 +54,9 @@ int main(int ac, char *av[]) {
     std::string line;
     std::string inFilename = "notSet";
     std::string outFilename = "notSet";
-    unsigned int xBrickDim = 0;
-    unsigned int yBrickDim = 0;
-    unsigned int zBrickDim = 0;
+    size_t xBrickDim = 0;
+    size_t yBrickDim = 0;
+    size_t zBrickDim = 0;
     while (std::getline(in, line)) {
         // Ignore empty lines and comments
         if (!line.empty() && line.at(0) != '#') {

@@ -32,9 +32,9 @@ public:
   // Setters for various variables
   void SetInFilename(std::string _inFilename);
   void SetOutFilename(std::string _outFilename);
-  void SetBrickDimensions(unsigned int _xBrickDim,
-                          unsigned int _yBrickDim,
-                          unsigned int _zBrickDim);
+  void SetBrickDimensions(size_t _xBrickDim,
+                          size_t _yBrickDim,
+                          size_t _zBrickDim);
 
   // Execute all construction steps
   bool Construct();
@@ -47,35 +47,35 @@ private:
   std::string outFilename_;
   std::string tempFilename_;
 
-  const unsigned int paddingWidth_ = 1;
+  const size_t paddingWidth_ = 1;
 
   std::vector<Brick<float>*> bricks_;
 
   // Data that ends up in the out file
-  unsigned int gridType_;
-  unsigned int numTimesteps_;
-  unsigned int xDim_;
-  unsigned int yDim_;
-  unsigned int zDim_;
-  unsigned int xBrickDim_;
-  unsigned int yBrickDim_;
-  unsigned int zBrickDim_;
-  unsigned int xNumBricks_;
-  unsigned int yNumBricks_;
-  unsigned int zNumBricks_;
-  unsigned int dataSize_;
+  size_t gridType_;
+  size_t numTimesteps_;
+  size_t xDim_;
+  size_t yDim_;
+  size_t zDim_;
+  size_t xBrickDim_;
+  size_t yBrickDim_;
+  size_t zBrickDim_;
+  size_t xNumBricks_;
+  size_t yNumBricks_;
+  size_t zNumBricks_;
+  size_t dataSize_;
 
   // Additional metadata
-  unsigned int numBricksBaseLevel_;
-  unsigned int numLevels_;
-  unsigned int numBricksPerOctree_;
-  unsigned int numBricksTotal_;
-  unsigned int xPaddedDim_;
-  unsigned int yPaddedDim_;
-  unsigned int zPaddedDim_;
-  unsigned int xPaddedBrickDim_;
-  unsigned int yPaddedBrickDim_;
-  unsigned int zPaddedBrickDim_;
+  size_t numBricksBaseLevel_;
+  size_t numLevels_;
+  size_t numBricksPerOctree_;
+  size_t numBricksTotal_;
+  size_t xPaddedDim_;
+  size_t yPaddedDim_;
+  size_t zPaddedDim_;
+  size_t xPaddedBrickDim_;
+  size_t yPaddedBrickDim_;
+  size_t zPaddedBrickDim_;
 
   // Read metadata from VDF file and calculate additional metadata
   bool ReadMetadata();
@@ -89,19 +89,19 @@ private:
   // Points to first data entry after header
   size_t headerOffset_;
 
-  bool buildDataLevels(std::FILE* file, unsigned int timestep, std::vector< std::vector<float> >& levelData);
+  bool buildDataLevels(std::FILE* file, size_t timestep, std::vector< std::vector<float> >& levelData);
   bool createPadding(std::vector< std::vector<float> >& levelData, std::vector< std::vector<float> >& paddedLevelData);
   bool buildOctree(std::vector< std::vector<float> >& paddedLevelData, std::vector< Brick<float>* >& octreeBricks);
 
   // Calculate Z-order index from x, y, z coordinates
   uint32_t ZOrder(uint16_t x, uint16_t y, uint16_t z);
 
-  glm::ivec3 linearToCartesian(unsigned int linearCoords, int dim);
-  glm::ivec3 linearToCartesian(unsigned int linearCoords, int xDim, int yDim, int zDim);
-  glm::ivec3 linearToCartesian(unsigned int linearCoords, glm::ivec3 dim);
-  unsigned int cartesianToLinear(glm::ivec3 cartesianCoords, int dim);
-  unsigned int cartesianToLinear(glm::ivec3 cartesianCoords, int xDim, int yDim, int zDim);
-  unsigned int cartesianToLinear(glm::ivec3 cartesianCoords, glm::ivec3 dim);
+  glm::ivec3 linearToCartesian(size_t linearCoords, int dim);
+  glm::ivec3 linearToCartesian(size_t linearCoords, int xDim, int yDim, int zDim);
+  glm::ivec3 linearToCartesian(size_t linearCoords, glm::ivec3 dim);
+  size_t cartesianToLinear(glm::ivec3 cartesianCoords, int dim);
+  size_t cartesianToLinear(glm::ivec3 cartesianCoords, int xDim, int yDim, int zDim);
+  size_t cartesianToLinear(glm::ivec3 cartesianCoords, glm::ivec3 dim);
 
 };
 

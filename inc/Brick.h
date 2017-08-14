@@ -11,28 +11,28 @@ namespace osp {
 template <class T>
 class Brick {
 public:
-  static Brick * New(unsigned int _xDim,
-                     unsigned int _yDim,
-                     unsigned int _zDim,
+  static Brick * New(size_t _xDim,
+                     size_t _yDim,
+                     size_t _zDim,
                      T _defaultVal) {
     return new Brick<T>(_xDim, _yDim, _zDim, _defaultVal);
   }
   ~Brick() {}
   
-  void SetData(unsigned int _x,
-               unsigned int _y,
-               unsigned int _z,
+  void SetData(size_t _x,
+               size_t _y,
+               size_t _z,
                T _value) {
     data_[Index(_x, _y, _z)] = _value;
   }
 
-  T Data(unsigned int _x,
-         unsigned int _y,
-         unsigned int _z) const {
+  T Data(size_t _x,
+         size_t _y,
+         size_t _z) const {
     return data_[Index(_x, _y, _z)];
   }
 
-  unsigned int Size() const {
+  size_t Size() const {
     return sizeof(T)*data_.size();
   }
 
@@ -44,9 +44,9 @@ public:
       std::cout << "Brick::Add(): Dimension mismatch" << std::endl;
       return false;
     }
-    for (unsigned int z=0; z<zDim_; ++z) {
-      for (unsigned int y=0; y<yDim_; ++y) {
-        for (unsigned int x=0; x<xDim_; ++x) {
+    for (size_t z=0; z<zDim_; ++z) {
+      for (size_t y=0; y<yDim_; ++y) {
+        for (size_t x=0; x<xDim_; ++x) {
           SetData(x, y, z, Data(x, y, z) + _brick->Data(x, y, z));  
         }
       }
@@ -60,9 +60,9 @@ public:
       std::cout << "Brick::Divide(): Division by zero" << std::endl;
       return false;
     }
-    for (unsigned int z=0; z<zDim_; ++z) {
-      for (unsigned int y=0; y<yDim_; ++y) {
-        for (unsigned int x=0; x<xDim_; ++x) {
+    for (size_t z=0; z<zDim_; ++z) {
+      for (size_t y=0; y<yDim_; ++y) {
+        for (size_t x=0; x<xDim_; ++x) {
           SetData(x, y, z, Data(x, y, z)/_divisor);  
         }
       }
@@ -88,11 +88,11 @@ public:
   // Filter a brick by combining 2x2x2 voxels
   // Resulting brick has half size dimensions
   static Brick<T> * Filter(Brick<T> *_brick) {
-    unsigned int dim = _brick->xDim_;
+    size_t dim = _brick->xDim_;
     Brick<T> *out = Brick<T>::New(dim/2, dim/2, dim/2, static_cast<T>(0));
-    for (unsigned int z=0; z<dim; z+=2) {
-      for (unsigned int y=0; y<dim; y+=2) {
-        for (unsigned int x=0; x<dim; x+=2) {
+    for (size_t z=0; z<dim; z+=2) {
+      for (size_t y=0; y<dim; y+=2) {
+        for (size_t x=0; x<dim; x+=2) {
           std::vector<T> toAverage(8, static_cast<T>(0));
           // Specify the eight voxels to average
           toAverage[0] = _brick->Data(x,   y,   z  );
@@ -127,7 +127,7 @@ public:
   // 7: x+1, y+1, z+1
   static Brick<T> * Combine(std::vector<Brick<T> *> _bricks) {
     // Assume all input sizes are equal
-    unsigned int dim = _bricks[0]->xDim_;
+    size_t dim = _bricks[0]->xDim_;
     Brick<T> *out =  Brick<T>::New(dim*2, dim*2, dim*2, static_cast<T>(0));
     
     if (_bricks.size() != 8) {
@@ -136,9 +136,9 @@ public:
     }
 
     // Loop over positions in new brick 
-    for (unsigned int z=0; z<dim*2; ++z) {
-      for (unsigned int y=0; y<dim*2; ++y) {
-        for (unsigned int x=0; x<dim*2; ++x) {
+    for (size_t z=0; z<dim*2; ++z) {
+      for (size_t y=0; y<dim*2; ++y) {
+        for (size_t x=0; x<dim*2; ++x) {
         
           T value;
           // Choose and sample from the right quadrant
@@ -185,23 +185,23 @@ public:
   friend class Forge;
 
 private:
-  Brick(unsigned int _xDim,
-        unsigned int _yDim,
-        unsigned int _zDim,
+  Brick(size_t _xDim,
+        size_t _yDim,
+        size_t _zDim,
         T _defaultVal)
         : xDim_(_xDim), yDim_(_yDim), zDim_(_zDim) {
     data_.resize(_xDim*_yDim*_zDim, _defaultVal);
   }
   Brick();
   Brick(const Brick&);
-  unsigned int Index(unsigned int _x,
-                     unsigned int _y,
-                     unsigned int _z) const {
+  size_t Index(size_t _x,
+                     size_t _y,
+                     size_t _z) const {
     return _x + _y*xDim_ + _z*xDim_*yDim_;
   }
-  unsigned int xDim_;
-  unsigned int yDim_;
-  unsigned int zDim_;
+  size_t xDim_;
+  size_t yDim_;
+  size_t zDim_;
   std::vector<T> data_;
 };
 

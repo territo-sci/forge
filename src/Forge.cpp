@@ -62,9 +62,9 @@ void Forge::SetOutFilename(std::string _outFilename) {
     outFilename_ = _outFilename;
 }
 
-void Forge::SetBrickDimensions(unsigned int _xBrickDim,
-                               unsigned int _yBrickDim,
-                               unsigned int _zBrickDim) {
+void Forge::SetBrickDimensions(size_t _xBrickDim,
+                               size_t _yBrickDim,
+                               size_t _zBrickDim) {
     xBrickDim_ = _xBrickDim;
     yBrickDim_ = _yBrickDim;
     zBrickDim_ = _zBrickDim;
@@ -120,7 +120,7 @@ bool Forge::ReadMetadata() {
         return false;
     }
 
-    size_t s = sizeof(unsigned int);
+    size_t s = sizeof(size_t);
     fread(reinterpret_cast<void *>(&gridType_), s, 1, in);
     fread(reinterpret_cast<void *>(&numTimesteps_), s, 1, in);
     fread(reinterpret_cast<void *>(&xDim_), s, 1, in);
@@ -213,10 +213,10 @@ bool Forge::CreateOctrees() {
     }
 
     // Loop over all timesteps
-    for (unsigned int timestep = 0; timestep < numTimesteps_; timestep++) {
+    for (size_t timestep = 0; timestep < numTimesteps_; timestep++) {
         std::cout << "Constructing octree for timestep " << timestep << "/" << numTimesteps_ << "\r" << std::flush;
 
-        unsigned int nOctreeLevels = log(numBricksBaseLevel_) / log(8) + 1;
+        size_t nOctreeLevels = log(numBricksBaseLevel_) / log(8) + 1;
         std::vector<std::vector<float> > levelData(nOctreeLevels);
 
         if (!buildDataLevels(in, timestep, levelData)) {
@@ -253,10 +253,10 @@ bool Forge::CreateOctrees() {
 }
 
 
-bool Forge::buildDataLevels(std::FILE *file, unsigned int timestep, std::vector<std::vector<float> > &levelData) {
-    unsigned int nOctreeLevels = levelData.size();
+bool Forge::buildDataLevels(std::FILE *file, size_t timestep, std::vector<std::vector<float> > &levelData) {
+    size_t nOctreeLevels = levelData.size();
 
-    unsigned int nBaseLevelVoxels = xDim_ * yDim_ * zDim_;
+    size_t nBaseLevelVoxels = xDim_ * yDim_ * zDim_;
     levelData[0].resize(nBaseLevelVoxels);
 
     size_t timestepSize = nBaseLevelVoxels * dataSize_;
@@ -265,32 +265,32 @@ bool Forge::buildDataLevels(std::FILE *file, unsigned int timestep, std::vector<
     fread(reinterpret_cast<void *>(&levelData[0][0]), timestepSize, 1, file);
 
     glm::ivec3 levelDim(xDim_, yDim_, zDim_);
-    for (unsigned int level = 1; level < nOctreeLevels; level++) {
-        unsigned int childLevel = level - 1;
+    for (size_t level = 1; level < nOctreeLevels; level++) {
+        size_t childLevel = level - 1;
         glm::ivec3 childLevelDim = levelDim;
         levelDim /= 2;
-        unsigned int nLevelVoxels = levelDim.x * levelDim.y * levelDim.z;
+        size_t nLevelVoxels = levelDim.x * levelDim.y * levelDim.z;
         levelData[level].resize(nLevelVoxels);
 
-        for (int z = 0; z < levelDim.z; z++) {
-            for (int y = 0; y < levelDim.y; y++) {
-                for (int x = 0; x < levelDim.x; x++) {
+        for (size_t z = 0; z < levelDim.z; z++) {
+            for (size_t y = 0; y < levelDim.y; y++) {
+                for (size_t x = 0; x < levelDim.x; x++) {
                     glm::ivec3 voxelPos(x, y, z);
 
                     float voxelData = 0.0;
-                    for (int childZ = 0; childZ < 2; childZ++) {
-                        for (int childY = 0; childY < 2; childY++) {
-                            for (int childX = 0; childX < 2; childX++) {
+                    for (size_t childZ = 0; childZ < 2; childZ++) {
+                        for (size_t childY = 0; childY < 2; childY++) {
+                            for (size_t childX = 0; childX < 2; childX++) {
                                 glm::ivec3 localChildPos(childX, childY, childZ);
                                 glm::ivec3 childPos = voxelPos * 2 + localChildPos;
-                                unsigned int childVoxelIndex = cartesianToLinear(childPos, childLevelDim);
+                                size_t childVoxelIndex = cartesianToLinear(childPos, childLevelDim);
                                 voxelData += levelData[childLevel][childVoxelIndex];
                             }
                         }
                     }
                     voxelData /= 8.0;
 
-                    unsigned int voxelIndex = cartesianToLinear(voxelPos, levelDim);
+                    size_t voxelIndex = cartesianToLinear(voxelPos, levelDim);
                     levelData[level][voxelIndex] = voxelData;
                 }
             }
@@ -302,7 +302,7 @@ bool Forge::buildDataLevels(std::FILE *file, unsigned int timestep, std::vector<
 
 bool Forge::createPadding(std::vector<std::vector<float> > &levelData,
                           std::vector<std::vector<float> > &paddedLevelData) {
-    unsigned int nOctreeLevels = log(numBricksBaseLevel_) / log(8) + 1;
+    size_t nOctreeLevels = log(numBricksBaseLevel_) / log(8) + 1;
 
     if (levelData.size() != nOctreeLevels || paddedLevelData.size() != nOctreeLevels) {
         return false;
@@ -311,23 +311,23 @@ bool Forge::createPadding(std::vector<std::vector<float> > &levelData,
     glm::ivec3 paddingOffset(paddingWidth_);
     glm::ivec3 levelDim(xDim_, yDim_, zDim_);
 
-    for (unsigned int level = 0; level < nOctreeLevels; level++) {
+    for (size_t level = 0; level < nOctreeLevels; level++) {
         glm::ivec3 paddedLevelDim = levelDim + paddingOffset * 2;
-        unsigned int nPaddedLevelVoxels = paddedLevelDim.x * paddedLevelDim.y * paddedLevelDim.z;
+        size_t nPaddedLevelVoxels = paddedLevelDim.x * paddedLevelDim.y * paddedLevelDim.z;
         paddedLevelData[level].resize(nPaddedLevelVoxels);
 
-        for (int z = 0; z < paddedLevelDim.z; z++) {
-            for (int y = 0; y < paddedLevelDim.y; y++) {
-                for (int x = 0; x < paddedLevelDim.x; x++) {
+        for (size_t z = 0; z < paddedLevelDim.z; z++) {
+            for (size_t y = 0; y < paddedLevelDim.y; y++) {
+                for (size_t x = 0; x < paddedLevelDim.x; x++) {
                     glm::ivec3 paddedLevelVoxelPos(x, y, z);
-                    unsigned int paddedLevelVoxel = cartesianToLinear(paddedLevelVoxelPos, paddedLevelDim);
+                    size_t paddedLevelVoxel = cartesianToLinear(paddedLevelVoxelPos, paddedLevelDim);
 
                     glm::ivec3 samplePos = paddedLevelVoxelPos - paddingOffset;
                     samplePos.x = glm::clamp(samplePos.x, 0, levelDim.x - 1);
                     samplePos.y = glm::clamp(samplePos.y, 0, levelDim.y - 1);
                     samplePos.z = glm::clamp(samplePos.z, 0, levelDim.z - 1);
 
-                    unsigned int levelVoxel = cartesianToLinear(samplePos, levelDim);
+                    size_t levelVoxel = cartesianToLinear(samplePos, levelDim);
                     paddedLevelData[level][paddedLevelVoxel] = levelData[level][levelVoxel];
                 }
             }
@@ -341,17 +341,17 @@ bool Forge::createPadding(std::vector<std::vector<float> > &levelData,
 
 bool
 Forge::buildOctree(std::vector<std::vector<float> > &paddedLevelData, std::vector<Brick<float> *> &octreeBricks) {
-    unsigned int maxLevel = paddedLevelData.size() - 1;
+    size_t maxLevel = paddedLevelData.size() - 1;
 
     glm::ivec3 paddingOffset(paddingWidth_);
     glm::ivec3 brickDim(xBrickDim_, yBrickDim_, zBrickDim_);
     glm::ivec3 paddedBrickDim = brickDim + 2 * paddingOffset;
 
-    unsigned int levelOffset = 0;
+    size_t levelOffset = 0;
 
-    for (unsigned int level = 0; level <= maxLevel; level++) {
-        unsigned int depth = maxLevel - level;
-        unsigned int nBricksPerDim = pow(2, depth);
+    for (size_t level = 0; level <= maxLevel; level++) {
+        size_t depth = maxLevel - level;
+        size_t nBricksPerDim = pow(2, depth);
 
         glm::ivec3 paddedLevelDataDim = brickDim;
         paddedLevelDataDim.x *= nBricksPerDim;
@@ -373,50 +373,50 @@ Forge::buildOctree(std::vector<std::vector<float> > &paddedLevelData, std::vecto
                             for (int voxelX = 0; voxelX < paddedBrickDim.x; voxelX++) {
                                 glm::ivec3 voxelPos(voxelX, voxelY, voxelZ);
                                 glm::ivec3 voxelOffset = brickOffset + voxelPos;
-                                unsigned int voxel = cartesianToLinear(voxelOffset, paddedLevelDataDim);
+                                size_t voxel = cartesianToLinear(voxelOffset, paddedLevelDataDim);
                                 brick->SetData(voxelPos.x, voxelPos.y, voxelPos.z, paddedLevelData[level][voxel]);
                             }
                         }
                     }
 
-                    unsigned int zOrderIdx = static_cast<unsigned int>(ZOrder(brickX, brickY, brickZ));
-                    unsigned int brickIndex = levelOffset + zOrderIdx;
+                    size_t zOrderIdx = static_cast<size_t>(ZOrder(brickX, brickY, brickZ));
+                    size_t brickIndex = levelOffset + zOrderIdx;
                     octreeBricks[brickIndex] = brick;
                 }
             }
         }
 
-        unsigned int nBricksInLevel = nBricksPerDim * nBricksPerDim * nBricksPerDim;
+        size_t nBricksInLevel = nBricksPerDim * nBricksPerDim * nBricksPerDim;
         levelOffset += nBricksInLevel;
     }
 
     return true;
 }
 
-glm::ivec3 Forge::linearToCartesian(unsigned int linearCoords, int dim) {
+glm::ivec3 Forge::linearToCartesian(size_t linearCoords, int dim) {
     return linearToCartesian(linearCoords, dim, dim, dim);
 }
 
-glm::ivec3 Forge::linearToCartesian(unsigned int linearCoords, int xDim, int yDim, int zDim) {
+glm::ivec3 Forge::linearToCartesian(size_t linearCoords, int xDim, int yDim, int zDim) {
     return linearToCartesian(linearCoords, glm::ivec3(xDim, yDim, zDim));
 }
 
-glm::ivec3 Forge::linearToCartesian(unsigned int linearCoords, glm::ivec3 dim) {
+glm::ivec3 Forge::linearToCartesian(size_t linearCoords, glm::ivec3 dim) {
     int z = linearCoords / (dim.x * dim.y);
     int y = (linearCoords / dim.x) % dim.y;
     int x = linearCoords % dim.x;
     return glm::ivec3(x, y, z);
 }
 
-unsigned int Forge::cartesianToLinear(glm::ivec3 cartesianCoords, int dim) {
+size_t Forge::cartesianToLinear(glm::ivec3 cartesianCoords, int dim) {
     return cartesianToLinear(cartesianCoords, dim, dim, dim);
 }
 
-unsigned int Forge::cartesianToLinear(glm::ivec3 cartesianCoords, int xDim, int yDim, int zDim) {
+size_t Forge::cartesianToLinear(glm::ivec3 cartesianCoords, int xDim, int yDim, int zDim) {
     return cartesianToLinear(cartesianCoords, glm::ivec3(xDim, yDim, zDim));
 }
 
-unsigned int Forge::cartesianToLinear(glm::ivec3 cartesianCoords, glm::ivec3 dim) {
+size_t Forge::cartesianToLinear(glm::ivec3 cartesianCoords, glm::ivec3 dim) {
     return cartesianCoords.x + cartesianCoords.y * dim.x + cartesianCoords.z * dim.x * dim.y;
 }
 
@@ -450,8 +450,8 @@ bool Forge::DeleteTempFiles() {
         std::cout << "Warning: " << tempFilename_ << " does not exist" << std::endl;
     }
 
-    unsigned int numBSTLevels = log(numTimesteps_) / log(2) + 1;
-    for (unsigned int level = 0; level < numBSTLevels; ++level) {
+    size_t numBSTLevels = log(numTimesteps_) / log(2) + 1;
+    for (size_t level = 0; level < numBSTLevels; ++level) {
 
         std::stringstream ss;
         ss << level;
@@ -476,8 +476,8 @@ bool Forge::ConstructTSPTree() {
     }
 
     // Numbers to keep track of
-    unsigned int numOTNodes = numBricksPerOctree_;
-    unsigned int numBrickVals =
+    size_t numOTNodes = numBricksPerOctree_;
+    size_t numBrickVals =
             xPaddedBrickDim_ * yPaddedBrickDim_ * zPaddedBrickDim_;
 
     std::cout << "Num nodes per OT: " << numOTNodes << std::endl;
@@ -485,7 +485,7 @@ bool Forge::ConstructTSPTree() {
 
     // Keep track of the original number of timesteps in case we need to
     // adjust it. Both the original and the adjusted versions go in the header.
-    unsigned int origNumTimesteps = numTimesteps_;
+    size_t origNumTimesteps = numTimesteps_;
 
     // If the number of timesteps is not a power of two, we copy the last
     // timestep to make the base level contain a number that is the next
@@ -494,9 +494,9 @@ bool Forge::ConstructTSPTree() {
     if (!powTwo) {
 
         // Find the next power of two higher than the number of timesteps
-        unsigned int newNumTimesteps = static_cast<unsigned int>(
+        size_t newNumTimesteps = static_cast<size_t>(
                 powf(2.f, ceilf(logf(static_cast<float>(numTimesteps_)) / logf(2.f))));
-        unsigned int timesToCopy = newNumTimesteps - numTimesteps_;
+        size_t timesToCopy = newNumTimesteps - numTimesteps_;
 
         std::cout << "Number of timesteps is not a power of two " << std::endl;
         std::cout << "Copying the last timestep " << timesToCopy << " times" <<
@@ -529,7 +529,7 @@ bool Forge::ConstructTSPTree() {
 
         // Write the extra timesteps at the end of the file
         fseeko(out, 0, SEEK_END);
-        for (unsigned int i = 0; i < timesToCopy; ++i) {
+        for (size_t i = 0; i < timesToCopy; ++i) {
             fwrite(reinterpret_cast<void *>(&buffer[0]), timestepSize, 1, out);
         }
 
@@ -543,14 +543,14 @@ bool Forge::ConstructTSPTree() {
     }
 
     // More numbers to keep track of
-    unsigned int numBSTNodes = 2 * numTimesteps_ - 1;
-    unsigned int numBSTLevels = log(numTimesteps_) / log(2) + 1;
+    size_t numBSTNodes = 2 * numTimesteps_ - 1;
+    size_t numBSTLevels = log(numTimesteps_) / log(2) + 1;
 
     std::cout << "Num nodes per BST: " << numBSTNodes << std::endl;
     std::cout << "Num BST levels: " << numBSTLevels << std::endl;
 
     // Append the temp file to match leaf BST level
-    unsigned int BSTLevel = numBSTLevels - 1;
+    size_t BSTLevel = numBSTLevels - 1;
 
     std::string newFilename;
 
@@ -582,13 +582,13 @@ bool Forge::ConstructTSPTree() {
         // Write to out file in reverse order
 
         // Position at end of file
-        for (unsigned int ts = 0; ts < numTimesteps_; ++ts) {
+        for (size_t ts = 0; ts < numTimesteps_; ++ts) {
 
             size_t octreePos = static_cast<size_t>((numOTNodes) * numBrickVals * (ts + 1));
-            for (unsigned int level = 0; level < numLevels_; ++level) {
+            for (size_t level = 0; level < numLevels_; ++level) {
 
-                unsigned int bricksPerLevel = pow(8, level);
-                unsigned int valuesPerLevel = numBrickVals * bricksPerLevel;
+                size_t bricksPerLevel = pow(8, level);
+                size_t valuesPerLevel = numBrickVals * bricksPerLevel;
                 octreePos -= valuesPerLevel;
                 std::vector<float> buffer(valuesPerLevel);
 
@@ -607,8 +607,8 @@ bool Forge::ConstructTSPTree() {
 
     // Create one file for every level of the BST tree structure
     // by averaging the values in the one below.
-    unsigned int numTimestepsInLevel = numTimesteps_;
-    unsigned int numValsInOT = numBrickVals * numOTNodes;
+    size_t numTimestepsInLevel = numTimesteps_;
+    size_t numValsInOT = numBrickVals * numOTNodes;
     std::vector<float> inBuffer1(numValsInOT);
     std::vector<float> inBuffer2(numValsInOT);
     std::vector<float> outBuffer(numValsInOT);
@@ -641,14 +641,14 @@ bool Forge::ConstructTSPTree() {
         fseeko(in, 0, SEEK_END);
         fseeko(in, 0, SEEK_SET);
 
-        for (unsigned int ts = 0; ts < numTimestepsInLevel; ts += 2) {
+        for (size_t ts = 0; ts < numTimestepsInLevel; ts += 2) {
 
             // Read two octrees (two time steps)
             fread(reinterpret_cast<void *>(&inBuffer1[0]), OTBytes, 1, in);
             fread(reinterpret_cast<void *>(&inBuffer2[0]), OTBytes, 1, in);
 
             // Average time steps
-            for (unsigned int i = 0; i < outBuffer.size(); ++i) {
+            for (size_t i = 0; i < outBuffer.size(); ++i) {
                 outBuffer[i] = (inBuffer1[i] + inBuffer2[i]) / static_cast<float>(2);
             }
 
@@ -676,7 +676,7 @@ bool Forge::ConstructTSPTree() {
 
     // Write header
     std::cout << "Writing header" << std::endl;
-    size_t s = sizeof(unsigned int);
+    size_t s = sizeof(size_t);
     fwrite(reinterpret_cast<void *>(&gridType_), s, 1, out);
     fwrite(reinterpret_cast<void *>(&origNumTimesteps), s, 1, out);
     fwrite(reinterpret_cast<void *>(&numTimesteps_), s, 1, out);
@@ -687,7 +687,7 @@ bool Forge::ConstructTSPTree() {
     fwrite(reinterpret_cast<void *>(&yNumBricks_), s, 1, out);
     fwrite(reinterpret_cast<void *>(&zNumBricks_), s, 1, out);
 
-    for (unsigned int level = 0; level < numBSTLevels; ++level) {
+    for (size_t level = 0; level < numBSTLevels; ++level) {
 
         std::cout << "Writing level " << level + 1 << " to output" << std::endl;
 
@@ -731,11 +731,11 @@ bool Forge::ConstructTSPTree() {
         return false;
     }
 
-    unsigned int gridTypeTest, origNumTimestepsTest,
+    size_t gridTypeTest, origNumTimestepsTest,
             numTimestepsTest, xBrickDimTest,
             yBrickDimTest, zBrickDimTest, xNumBricksTest, yNumBricksTest,
             zNumBricksTest;
-    s = sizeof(unsigned int);
+    s = sizeof(size_t);
     fread(reinterpret_cast<void *>(&gridTypeTest), s, 1, in);
     fread(reinterpret_cast<void *>(&origNumTimestepsTest), s, 1, in);
     fread(reinterpret_cast<void *>(&numTimestepsTest), s, 1, in);
